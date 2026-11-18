@@ -576,7 +576,9 @@ function serverSettings(box) {
   const sn = $('#syncnow'); if (sn) sn.onclick = () => pull().then(render);
   const ul = $('#unlink'); if (ul) ul.onclick = async () => { if (await confirmBox('فصل التطبيق عن الخادم على هذا الجهاز؟ (تبقى نسخة محلية)')) { localStorage.removeItem(LS.server); S.server = ''; S.token = null; S.me = null; saveSession(); render(); } };
   const cb = $('#conn'); if (cb) cb.onclick = async () => {
-    const url = $('#surl').value.trim(); if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) return toast('الرابط غير صحيح');
+    const url = $('#surl').value.trim();
+    if (/docs\.google\.com\/spreadsheets/.test(url)) return modal({ title: 'هذا رابط الجدول وليس رابط الخادم', body: '<p>الرابط المطلوب هو <b>رابط تطبيق الويب</b> الذي يظهر بعد النشر، ويبدأ بـ <span dir="ltr">https://script.google.com/macros/s/</span> وينتهي بـ <b dir="ltr">/exec</b></p><ol style="line-height:2"><li>في الجدول: <b>الإضافات ← Apps Script</b></li><li>الصق كود الخادم واحفظ، ثم شغّل الدالة <b>setup</b></li><li>اضغط <b>نشر ← نشر جديد</b> ← نوع: <b>تطبيق ويب</b> ← التنفيذ: <b>أنا</b> ← الوصول: <b>أي شخص</b> ← نشر</li><li>انسخ <b>رابط تطبيق الويب</b> (Web app URL) والصقه هنا</li></ol>', foot: false });
+    if (!/^https:\/\/script\.google(usercontent)?\.com\/.*\/exec/.test(url)) return toast('الرابط يجب أن يبدأ بـ script.google.com وينتهي بـ /exec');
     cb.disabled = true; cb.textContent = '⏳';
     try {
       const r = await api('ping', {}, url); if (!r.ok) throw new Error(r.error || 'خطأ');
