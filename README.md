@@ -11,7 +11,7 @@
 - `server/Code.gs` — الخادم (Google Sheets + Apps Script)
 
 ## التشغيل
-1. افتح التطبيق: https://aboyehia15-droid.github.io/tahfeez/
+1. افتح التطبيق: https://aboyehia15-droid.github.io/goto/tahfeez/
 2. الإعدادات ← الربط بالخادم ← اتبع الخطوات (لصق `server/Code.gs` في Apps Script ونشره).
 3. أرسل رابط التسجيل لأولياء الأمور ← فعّل المسجلين ← أضف المعلمين والفصول ← ابدأ المتابعة.
 
