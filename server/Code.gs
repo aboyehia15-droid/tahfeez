@@ -28,7 +28,17 @@ function setup() {
   Object.keys(TABLES).forEach(function (t) { sheet_(t); });
   var s1 = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
   if (s1 && ss.getSheets().length > 1) { try { ss.deleteSheet(s1); } catch (e) {} }
+  receiptsFolder_(); // لطلب صلاحية Google Drive لحفظ إيصالات الرسوم
   return 'تم التجهيز';
+}
+
+function receiptsFolder_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('RECEIPTS_FOLDER');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  var f = DriveApp.createFolder('إيصالات رسوم الحلقات — منصة متابعة الحلقات');
+  props.setProperty('RECEIPTS_FOLDER', f.getId());
+  return f;
 }
 
 function sheet_(name) {
@@ -244,6 +254,14 @@ function route_(r) {
       for (var i = ids.length - 1; i >= 0; i--) if ((r.ids || []).indexOf(ids[i]) >= 0) sh.deleteRow(i + 2);
     }
     return { ok: true };
+  }
+
+  if (a === 'upload') { // رفع إيصال سداد إلى Google Drive
+    if (me.role === 'teacher') return { ok: false, error: 'لا تملك الصلاحية' };
+    var blob = Utilities.newBlob(Utilities.base64Decode(r.data), r.mime || 'application/octet-stream', r.name || 'إيصال');
+    var file = receiptsFolder_().createFile(blob);
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+    return { ok: true, url: 'https://drive.google.com/file/d/' + file.getId() + '/view', id: file.getId() };
   }
 
   if (a === 'sendWA') { // إرسال تلقائي عبر مزود واتساب (اختياري)

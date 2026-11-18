@@ -173,7 +173,7 @@ function studentMenu(st) {
     ${f.fees && canAdmin() ? '<button class="btn light" data-a="fees">💰 الرسوم</button>' : ''}
     ${isAdmin() ? '<button class="btn red" data-a="del">🗑️ حذف نهائي</button>' : ''}
   </div>
-  <div class="card" style="margin-top:12px;font-size:13px">${STU_FIELDS.filter(x => st[x[0]]).map(x => `<div><span class="muted">${x[1]}:</span> ${esc(st[x[0]])}</div>`).join('')}</div>`, foot: false });
+  <div class="card" style="margin-top:12px;font-size:13px">${st.birthDate ? `<div><span class="muted">العمر:</span> <b>${ageFrom(st.birthDate)} سنوات</b>${st.birthDateHijri ? ` <span class="muted">(الميلاد هجري: ${esc(st.birthDateHijri)})</span>` : ''}</div>` : ''}${STU_FIELDS.filter(x => st[x[0]]).map(x => `<div><span class="muted">${x[1]}:</span> ${esc(st[x[0]])}</div>`).join('')}</div>`, foot: false });
   m.body.onclick = async e => {
     const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
     if (!st.parentToken) { st.parentToken = token20(); save('students', st); }
@@ -267,7 +267,7 @@ function importStudentsDialog() {
       if (hi < 0) return;
       const H = aoa[hi].map(h => String(h).trim());
       const col = re => H.findIndex(h => re.test(h));
-      const map = { name: col(/اسم الطالب|^الإسم|^الاسم/), idNumber: col(/السجل|الاقامة|الإقامة/), nationality: col(/الجنسية/), birthDate: col(/تاريخ الميلاد/), guardianName: col(/اسم ولي/), guardianId: col(/هوية ولي/), guardianPhone: col(/جوال ولي|جوال الأب|الجوال/), phone2: col(/جوال آخر|جوال اخر/), relation: col(/صلة/), work: col(/جهة العمل/), background: col(/خلفية/), health: col(/أمراض|امراض|حساسية/), className: col(/الفصل|الحلقة/) };
+      const map = { name: col(/اسم الطالب|^الإسم|^الاسم/), idNumber: col(/السجل|الاقامة|الإقامة/), nationality: col(/الجنسية/), birthDate: col(/تاريخ الميلاد/), guardianName: col(/اسم ولي/), guardianId: col(/هوية ولي/), guardianPhone: col(/جوال ولي|جوال الأب|الجوال/), phone2: col(/جوال آخر|جوال اخر/), relation: col(/صلة/), work: col(/جهة العمل/), background: col(/خلفية/), health: col(/أمراض|امراض|حساسية/), className: col(/الفصل|الحلقة/), teacher: col(/اسم المعلم|^المعلم/) };
       for (let i = hi + 1; i < aoa.length; i++) {
         const r = aoa[i]; const o = {};
         for (const k in map) if (map[k] >= 0) { let val = r[map[k]]; if (val instanceof Date) val = toISO(val); o[k] = String(val == null ? '' : val).trim(); }
@@ -285,6 +285,8 @@ function importStudentsDialog() {
     rows.forEach(o => {
       let cls = cid; if (!cls && o.className) { const c = T('classes').find(c => Q.norm(c.name) === Q.norm(o.className)); if (c) cls = c.id; }
       delete o.className;
+      if (!cls && o.teacher) { let u = T('users').find(x => Q.norm(x.name) === Q.norm(o.teacher)); if (!u) u = save('users', { id: uid('u'), name: o.teacher, role: 'teacher', active: true, username: '' }); let c = T('classes').find(c => c.teacherId === u.id); if (!c) c = save('classes', { id: uid('c'), name: 'حلقة الأستاذ ' + o.teacher, teacherId: u.id, track: 'mixed', subjects: ['quran', 'noor', 'zad'] }); cls = c.id; }
+      delete o.teacher;
       const ex = T('students').find(s => Q.norm(s.name) === Q.norm(o.name) || (o.idNumber && s.idNumber === o.idNumber));
       const obj = Object.assign(ex || { id: uid('s'), createdAt: Date.now(), source: 'excel', status: stt, parentToken: token20(), direction: S.settings.directionDefault }, Object.fromEntries(Object.entries(o).filter(([k, v]) => v)));
       if (cls) obj.classId = cls; save('students', obj); n++;
@@ -435,7 +437,7 @@ function viewFees(v) {
     const tf = all.reduce((a, x) => a + x.f, 0), tp = all.reduce((a, x) => a + x.p, 0);
     $('#fk').innerHTML = `<div class="stat"><span class="i">🧾</span><div class="n">${num(tf, 0)}</div><div class="l">إجمالي المستحق (${cur})</div></div><div class="stat"><span class="i">✅</span><div class="n" style="color:var(--green)">${num(tp, 0)}</div><div class="l">المسدد</div></div><div class="stat"><span class="i">⏳</span><div class="n" style="color:var(--red)">${num(Math.max(0, tf - tp), 0)}</div><div class="l">المتبقي</div></div><div class="stat"><span class="i">📈</span><div class="n">${tf ? Math.round(tp / tf * 100) : 0}%</div><div class="l">نسبة التحصيل</div></div>`;
     const R = rows();
-    $('#ft').innerHTML = `<tr><th>م</th><th>الطالب</th><th>الفصل</th><th>الرسوم</th><th>المسدد</th><th>المتبقي</th><th>الحالة</th><th></th></tr>` + R.map((x, i) => `<tr><td>${i + 1}</td><td class="r"><b>${esc(x.st.name)}</b></td><td>${esc((classOf(x.st) || {}).name || '')}</td><td>${num(x.f)}</td><td style="color:var(--green);font-weight:700">${num(x.p)}</td><td style="color:${x.r ? 'var(--red)' : ''};font-weight:700">${num(x.r)}</td><td>${{ paid: '<span class="chip green">مسدد</span>', part: '<span class="chip gold">جزئي</span>', none: '<span class="chip red">غير مسدد</span>', free: '<span class="chip gray">معفى</span>' }[x.state]}</td><td><button class="btn sm" data-pay="${x.st.id}">➕ سداد</button></td></tr>`).join('');
+    $('#ft').innerHTML = `<tr><th>م</th><th>الطالب</th><th>الفصل</th><th>الرسوم</th><th>المسدد</th><th>المتبقي</th><th>الحالة</th><th>الإيصالات</th><th></th></tr>` + R.map((x, i) => `<tr><td>${i + 1}</td><td class="r"><b>${esc(x.st.name)}</b></td><td>${esc((classOf(x.st) || {}).name || '')}</td><td>${num(x.f)}</td><td style="color:var(--green);font-weight:700">${num(x.p)}</td><td style="color:${x.r ? 'var(--red)' : ''};font-weight:700">${num(x.r)}</td><td>${{ paid: '<span class="chip green">مسدد</span>', part: '<span class="chip gold">جزئي</span>', none: '<span class="chip red">غير مسدد</span>', free: '<span class="chip gray">معفى</span>' }[x.state]}</td><td>${T('payments').filter(p => p.studentId === x.st.id && p.receiptUrl).map(p => `<a href="${esc(p.receiptUrl)}" target="_blank" title="${num(p.amount)} — ${fmtDate(p.date, false)}" style="text-decoration:none">📎</a>`).join(' ')}</td><td><button class="btn sm" data-pay="${x.st.id}">💰 الدفعات</button></td></tr>`).join('');
   };
   draw();
   ['#fq', '#fc', '#fs'].forEach(s => $(s).addEventListener('input', draw));
@@ -444,22 +446,60 @@ function viewFees(v) {
   $('#remind').onclick = () => waQueueDialog(rows().filter(x => x.r > 0).map(x => ({ name: x.st.name, phone: x.st.guardianPhone, text: fillTpl(S.settings.waFee, { student: x.st.name, remaining: num(x.r), link: parentLink(x.st) }) })), 'تذكير بالرسوم');
   $('#fexp').onclick = async () => { await loadXLSX(); const ws = XLSX.utils.json_to_sheet(rows().map((x, i) => ({ 'م': i + 1, 'الطالب': x.st.name, 'الفصل': (classOf(x.st) || {}).name || '', 'الرسوم': x.f, 'المسدد': x.p, 'المتبقي': x.r }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الرسوم'); XLSX.writeFile(wb, 'الرسوم.xlsx'); };
 }
+function fileToDataURL(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); }); }
+async function uploadReceipt(dataURL, name) {
+  if (isLocal()) throw new Error('رفع الإيصالات يحتاج الربط بالخادم');
+  const m = String(dataURL).match(/^data:([^;]+);base64,(.*)$/); if (!m) throw new Error('ملف غير صالح');
+  const r = await api('upload', { name, mime: m[1], data: m[2] });
+  if (!r.ok) throw new Error(r.error || 'تعذر الرفع'); return r.url;
+}
+async function pickReceiptFile(f) { if (!f) return null; if (f.size > 8e6) { toast('الملف كبير جداً'); return null; } return /^image\//.test(f.type) ? { data: await resizeImage(f, 1600), name: f.name.replace(/\.\w+$/, '') + '.jpg' } : { data: await fileToDataURL(f), name: f.name }; }
+function receiptLink(p) { return p.receiptUrl ? `<a class="btn sm light" target="_blank" href="${esc(p.receiptUrl)}" title="${esc(p.receiptName || '')}">📎 الإيصال</a>` : ''; }
+function paymentEditDialog(pay, after) {
+  const st = byId('students', pay.studentId);
+  const m = modal({ title: '✏️ تعديل دفعة — ' + esc(st ? st.name : ''), body: `<div class="grid g2">
+    <div class="field"><label>المبلغ (${S.settings.currency})</label><input class="inp" id="ea" type="number" value="${pay.amount}"></div>
+    <div class="field"><label>التاريخ</label><input class="inp" id="ed" type="date" value="${pay.date}"></div>
+    <div class="field"><label>طريقة السداد</label><select class="inp" id="em">${['نقداً', 'تحويل بنكي', 'شبكة (مدى)', 'أخرى'].map(o => `<option ${pay.method === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
+    <div class="field"><label>ملاحظة</label><input class="inp" id="en" value="${esc(pay.note || '')}"></div></div>
+    <div class="field"><label>الإيصال (صورة أو PDF)</label><div class="row">${receiptLink(pay) || '<span class="muted small">لا يوجد إيصال مرفق</span>'}<label class="btn sm light">📁 ${pay.receiptUrl ? 'استبدال' : 'إرفاق'}<input type="file" id="ef" accept="image/*,.pdf" hidden></label><span id="efn" class="small muted"></span></div></div>`,
+    foot: '<button class="btn" data-ok>💾 حفظ التعديل</button><button class="btn red" data-del>🗑️ حذف الدفعة</button>' });
+  let file = null;
+  $('#ef', m.el).onchange = async e => { file = await pickReceiptFile(e.target.files[0]); $('#efn', m.el).textContent = file ? '✔️ ' + file.name : ''; };
+  $('[data-ok]', m.el).onclick = async () => {
+    const amt = +$('#ea', m.el).value; if (!amt) return toast('اكتب المبلغ');
+    Object.assign(pay, { amount: amt, date: $('#ed', m.el).value, method: $('#em', m.el).value, note: $('#en', m.el).value });
+    if (file) { const b = $('[data-ok]', m.el); b.disabled = true; b.textContent = '⏳ رفع الإيصال…'; try { pay.receiptUrl = await uploadReceipt(file.data, (st ? st.name + ' — ' : '') + file.name); pay.receiptName = file.name; } catch (er) { toast('⚠️ ' + er.message); } b.disabled = false; }
+    save('payments', pay); m.close(); toast('✔️ تم التعديل'); after && after();
+  };
+  $('[data-del]', m.el).onclick = async () => { if (await confirmBox('حذف هذه الدفعة نهائياً؟')) { remove('payments', pay.id); m.close(); after && after(); } };
+}
 function paymentDialog(st, after) {
   const cur = S.settings.currency;
   const drawBody = () => { const pays = T('payments').filter(p => p.studentId === st.id).sort((a, b) => a.date < b.date ? 1 : -1); const f = feeOf(st), p = paidOf(st); return `
     <div class="kpis"><div class="kpi"><div class="v">${num(f)}</div><div class="t">الرسوم</div></div><div class="kpi"><div class="v" style="color:var(--green)">${num(p)}</div><div class="t">المسدد</div></div><div class="kpi"><div class="v" style="color:var(--red)">${num(Math.max(0, f - p))}</div><div class="t">المتبقي</div></div></div>
     <div class="row"><span class="small muted">الرسوم المقررة لهذا الطالب:</span><input class="inp" id="pfee" type="number" style="width:110px" value="${f}"><button class="btn sm light" id="savefee">حفظ</button></div>
-    <div class="card" style="margin-top:10px"><h3>➕ تسجيل دفعة</h3><div class="grid g2">
+    <div class="rep-sec">سجل الدفعات</div>${pays.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th><th>ملاحظة</th><th>الإيصال</th><th></th></tr>${pays.map(x => `<tr><td>${fmtDate(x.date, false)}</td><td><b>${num(x.amount)}</b></td><td>${esc(x.method || '')}</td><td class="small">${esc(x.note || '')}</td><td>${receiptLink(x) || '<span class="muted small">—</span>'}</td><td style="white-space:nowrap"><button class="btn sm light" data-ep="${x.id}" title="تعديل أو حذف">✏️</button> <button class="btn sm ghost" data-rc="${x.id}" title="سند قبض">🧾</button></td></tr>`).join('')}</table>` : '<div class="empty small">لا توجد دفعات</div>'}
+    <div class="card" style="margin-top:10px"><h3>➕ تسجيل دفعة جديدة</h3><div class="grid g2">
       <div class="field"><label>المبلغ (${cur})</label><input class="inp" id="pa" type="number" value="${Math.max(0, f - p) || ''}"></div>
       <div class="field"><label>التاريخ</label><input class="inp" id="pd" type="date" value="${todayISO()}"></div>
       <div class="field"><label>طريقة السداد</label><select class="inp" id="pm"><option>نقداً</option><option>تحويل بنكي</option><option>شبكة (مدى)</option><option>أخرى</option></select></div>
-      <div class="field"><label>ملاحظة / رقم السند</label><input class="inp" id="pn"></div></div><button class="btn" id="addpay">💾 تسجيل الدفعة</button></div>
-    <div class="rep-sec">سجل الدفعات</div>${pays.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th><th>ملاحظة</th><th></th></tr>${pays.map(x => `<tr><td>${fmtDate(x.date, false)}</td><td><b>${num(x.amount)}</b></td><td>${esc(x.method || '')}</td><td>${esc(x.note || '')}</td><td><button class="btn sm light" data-rc="${x.id}">🧾 سند</button> <button class="btn sm ghost" data-dp="${x.id}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty small">لا توجد دفعات</div>'}`; };
+      <div class="field"><label>ملاحظة / رقم السند</label><input class="inp" id="pn"></div></div>
+      <div class="row" style="margin-bottom:8px"><label class="btn sm light">📎 إرفاق الإيصال (صورة / PDF)<input type="file" id="pf" accept="image/*,.pdf" hidden></label><span id="pfn" class="small muted"></span></div>
+      <button class="btn" id="addpay">💾 تسجيل الدفعة</button></div>`; };
   const m = modal({ title: '💰 رسوم: ' + esc(st.name), body: drawBody(), foot: false, onClose: () => { after ? after() : (location.hash.startsWith('#/fees') && render()); } });
+  let file = null;
+  const redraw = () => { file = null; m.body.innerHTML = drawBody(); bind(); };
   const bind = () => {
-    $('#savefee', m.el).onclick = () => { st.fee = +$('#pfee', m.el).value; save('students', st); m.body.innerHTML = drawBody(); bind(); };
-    $('#addpay', m.el).onclick = () => { const a = +$('#pa', m.el).value; if (!a) return toast('اكتب المبلغ'); const p = save('payments', { id: uid('p'), studentId: st.id, amount: a, date: $('#pd', m.el).value, method: $('#pm', m.el).value, note: $('#pn', m.el).value, receipt: T('payments').length + 1 }); toast('✔️ سُجلت الدفعة'); m.body.innerHTML = drawBody(); bind(); receipt(p); };
-    m.body.onclick = async e => { const r = e.target.closest('[data-rc]'); if (r) receipt(byId('payments', r.dataset.rc)); const d = e.target.closest('[data-dp]'); if (d && await confirmBox('حذف الدفعة؟')) { remove('payments', d.dataset.dp); m.body.innerHTML = drawBody(); bind(); } };
+    $('#savefee', m.el).onclick = () => { st.fee = +$('#pfee', m.el).value; save('students', st); redraw(); };
+    $('#pf', m.el).onchange = async e => { file = await pickReceiptFile(e.target.files[0]); $('#pfn', m.el).textContent = file ? '✔️ ' + file.name : ''; };
+    $('#addpay', m.el).onclick = async () => {
+      const a = +$('#pa', m.el).value; if (!a) return toast('اكتب المبلغ');
+      const pay = { id: uid('p'), studentId: st.id, amount: a, date: $('#pd', m.el).value, method: $('#pm', m.el).value, note: $('#pn', m.el).value, receipt: T('payments').length + 1 };
+      if (file) { const b = $('#addpay', m.el); b.disabled = true; b.textContent = '⏳ رفع الإيصال…'; try { pay.receiptUrl = await uploadReceipt(file.data, st.name + ' — ' + file.name); pay.receiptName = file.name; } catch (er) { toast('⚠️ ' + er.message); } }
+      save('payments', pay); toast('✔️ سُجلت الدفعة'); redraw(); receipt(pay);
+    };
+    m.body.onclick = e => { const r = e.target.closest('[data-rc]'); if (r) receipt(byId('payments', r.dataset.rc)); const ep = e.target.closest('[data-ep]'); if (ep) paymentEditDialog(byId('payments', ep.dataset.ep), redraw); };
   };
   bind();
 }
@@ -557,9 +597,11 @@ function viewSettings(v, sub) {
   if (sub === 'server') serverSettings(box);
   if (sub === 'backup') {
     box.innerHTML = `<div class="card"><h3>💾 النسخ الاحتياطي</h3><div class="row"><button class="btn" id="bk">⬇️ تنزيل نسخة احتياطية</button><label class="btn light">⬆️ استعادة نسخة<input type="file" id="rs" accept=".json" hidden></label></div></div>
+      <div class="card"><h3>📦 استيراد حزمة بيانات جاهزة (دمج)</h3><p class="small muted">لملفات البيانات التي يجهزها Claude (طلاب + معلمون + فصول + رسوم وإيصالات). تُدمج مع الموجود دون حذف شيء، ويمكن إعادة الاستيراد بأمان دون تكرار.</p><label class="btn gold">📦 اختيار ملف الحزمة (.json)<input type="file" id="pack" accept=".json" hidden></label></div>
       <div class="card"><h3>🧪 بيانات تجريبية</h3><p class="small muted">لتجربة التطبيق قبل البدء الفعلي: يضيف فصلين ومعلمين وطلاباً من كشوفك مع سجلات لأسبوعين.</p><button class="btn gold" id="demo">✨ تحميل بيانات تجريبية</button> <button class="btn red" id="wipe">🗑️ مسح كل البيانات المحلية</button></div>`;
     $('#bk').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(S.data)], { type: 'application/json' })); a.download = 'نسخة-متابعة-الحلقات-' + todayISO() + '.json'; a.click(); };
     $('#rs').onchange = async e => { try { const d = JSON.parse(await e.target.files[0].text()); if (!await confirmBox('استبدال البيانات الحالية بالنسخة؟')) return; TABLE_NAMES.forEach(t => { if (Array.isArray(d[t])) { S.data[t] = []; d[t].forEach(r => save(t, r)); } }); toast('✔️ تمت الاستعادة'); render(); } catch (er) { toast('ملف غير صالح'); } };
+    $('#pack').onchange = e => importPack(e.target.files[0]);
     $('#demo').onclick = () => { loadDemo(); toast('✔️ أُضيفت البيانات التجريبية'); location.hash = '#/home'; };
     $('#wipe').onclick = async () => { if (await confirmBox('مسح كل البيانات المحلية على هذا الجهاز؟')) { localStorage.removeItem(LS.data); localStorage.removeItem(LS.queue); loadLocal(); render(); } };
   }
@@ -608,4 +650,60 @@ function viewLogin(root) {
   const go = async () => { const b = $('#lb'); b.disabled = true; b.textContent = '⏳'; try { const r = await api('login', { username: $('#lu').value.trim(), password: $('#lp').value }); if (!r.ok) throw new Error(r.error); S.token = r.token; S.me = r.user; saveSession(); await pull(true); location.hash = '#/home'; render(); } catch (e) { toast('⚠️ ' + e.message); } b.disabled = false; b.textContent = 'دخول'; };
   $('#lb').onclick = go; $('#lp').onkeydown = e => e.key === 'Enter' && go();
   $('#lx').onclick = async () => { if (await confirmBox('فصل الربط بالخادم والعمل محلياً على هذا الجهاز؟', 'نعم', false)) { localStorage.removeItem(LS.server); S.server = ''; render(); } };
+}
+
+/* ——— استيراد حزمة بيانات (طلاب، معلمون، فصول، رسوم وإيصالات) ——— */
+async function importPack(file) {
+  if (!file) return;
+  let pk; try { pk = JSON.parse(await file.text()); } catch (e) { return toast('ملف غير صالح'); }
+  if (pk.kind !== 'tahfeez-pack') return toast('هذا ليس ملف حزمة بيانات');
+  const m = modal({ title: '📦 ' + esc(pk.title || 'استيراد حزمة'), body: '<div id="pk-log" style="line-height:2"></div><div class="prog" style="margin-top:10px"><i id="pk-bar" style="width:0%"></i></div>', foot: false });
+  const log = h => { $('#pk-log', m.el).insertAdjacentHTML('beforeend', '<div>' + h + '</div>'); };
+  const bar = v => { $('#pk-bar', m.el).style.width = Math.round(v * 100) + '%'; };
+  if (pk.feeDefault) saveSettings({ feeDefault: pk.feeDefault });
+  // المعلمون والفصول (فصل لكل معلم)
+  const tmap = {}, cmap = {}; let nt = 0, nc = 0;
+  (pk.teachers || []).forEach(nm => {
+    let u = T('users').find(x => Q.norm(x.name) === Q.norm(nm));
+    if (!u) { u = save('users', { id: uid('u'), name: nm, role: 'teacher', active: true, username: '' }); nt++; }
+    tmap[nm] = u;
+    let c = T('classes').find(c => c.teacherId === u.id);
+    if (!c) { c = save('classes', { id: uid('c'), name: 'حلقة الأستاذ ' + nm, teacherId: u.id, track: 'mixed', subjects: ['quran', 'noor', 'zad'] }); nc++; }
+    cmap[nm] = c;
+  });
+  log(`👨‍🏫 المعلمون: ${(pk.teachers || []).length} (جديد ${nt}) — 🏫 الفصول: ${Object.keys(cmap).length} (جديد ${nc})`);
+  // الطلاب
+  const smap = {}; let ns = 0, us = 0, noCls = 0;
+  (pk.students || []).forEach(o => {
+    const ex = T('students').find(x => (o.idNumber && String(x.idNumber) === String(o.idNumber)) || Q.norm(x.name) === Q.norm(o.name));
+    const d = Object.assign({}, o); const teacher = d.teacher; delete d.teacher;
+    const obj = Object.assign(ex || { id: uid('s'), createdAt: Date.now(), source: 'excel', parentToken: token20(), direction: S.settings.directionDefault }, d);
+    obj.status = 'active'; if (pk.feeDefault) obj.fee = pk.feeDefault;
+    if (!obj.parentToken) obj.parentToken = token20();
+    if (teacher && cmap[teacher]) obj.classId = cmap[teacher].id; else if (!obj.classId) noCls++;
+    save('students', obj); smap[o.idNumber || o.name] = obj; ex ? us++ : ns++;
+  });
+  log(`👦 الطلاب: ${(pk.students || []).length} (جديد ${ns}، تحديث ${us})${noCls ? ` — <span style="color:var(--red)">${noCls} بدون معلم في الكشف (تجدهم في «بدون فصل»)</span>` : ''}`);
+  // الرسوم والإيصالات
+  const pays = pk.payments || []; let np = 0, up = 0, fail = 0; const urls = {};
+  T('payments').forEach(p => { if (p.receiptName && p.receiptUrl) urls[p.receiptName] = p.receiptUrl; });
+  if (isLocal() && pays.length) log('⚠️ التطبيق غير مربوط بالخادم: ستُسجَّل المبالغ، أما الإيصالات فتُرفع عند إعادة الاستيراد بعد الربط.');
+  log(`💰 الدفعات: <span id="pk-pay">0</span> / ${pays.length}`);
+  for (let i = 0; i < pays.length; i++) {
+    const p = pays[i]; const st = smap[p.studentKey]; if (!st) { fail++; continue; }
+    const key = 'imp|' + (p.studentKey) + '|' + p.receiptName + '|' + p.date + '|' + p.amount;
+    let pay = T('payments').find(x => x.importKey === key);
+    if (!pay) { pay = { id: uid('p'), studentId: st.id, amount: p.amount, date: p.date, method: p.method, note: p.note, receiptName: p.receiptName, importKey: key, receipt: T('payments').length + 1 }; np++; }
+    if (!pay.receiptUrl && !isLocal() && pk.receipts && pk.receipts[p.receiptName]) {
+      try { urls[p.receiptName] = urls[p.receiptName] || await uploadReceipt(pk.receipts[p.receiptName], p.receiptName); pay.receiptUrl = urls[p.receiptName]; up++; } catch (e) { fail++; console.warn(e); }
+    }
+    save('payments', pay);
+    $('#pk-pay', m.el).textContent = i + 1; bar((i + 1) / pays.length);
+  }
+  bar(1);
+  log(`✔️ دفعات جديدة ${np} — إيصالات مرفوعة ${up}${fail ? ` — <b style="color:var(--red)">تعذر ${fail} (أعد الاستيراد لاحقاً لإكمالها)</b>` : ''}`);
+  log(`<b>تم الاستيراد بحمد الله ✅</b> — الرسوم المقررة لكل طالب: ${num(pk.feeDefault || 0)} ${S.settings.currency}`);
+  m.foot && (m.foot.innerHTML = '');
+  $('#pk-log', m.el).insertAdjacentHTML('afterend', '<div class="row" style="margin-top:12px"><a class="btn" href="#/students">👦 الطلاب</a><a class="btn light" href="#/fees">💰 الرسوم</a><a class="btn light" href="#/classes">🏫 الفصول</a></div>');
+  flush();
 }
