@@ -101,7 +101,10 @@ function json_(o) {
 }
 
 function doGet(e) {
-  return json_({ ok: true, app: 'tahfeez', time: Date.now() });
+  var sheetOk = false, err = '';
+  try { var ss = SpreadsheetApp.getActiveSpreadsheet(); sheetOk = !!ss; if (!ss) err = 'الكود ليس داخل الجدول: افتحه من الجدول ← الإضافات ← Apps Script'; }
+  catch (x) { err = 'لم تُمنح الصلاحيات: شغّل الدالة setup ووافق على الصلاحيات ثم انشر إصداراً جديداً'; }
+  return json_({ ok: true, app: 'tahfeez', sheet: sheetOk, error: err, time: Date.now() });
 }
 
 function doPost(e) {
