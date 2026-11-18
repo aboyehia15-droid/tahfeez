@@ -4,6 +4,8 @@ const LS = { data: 'tz_data', sess: 'tz_session', server: 'tz_server', queue: 't
 
 const DEFAULT_SETTINGS = {
   id: 'main',
+  year: '1448',
+  years: [],
   orgName: 'جمعية تعلم للقرآن وعلومه',
   branchName: 'فرع الخبر والدمام',
   complexName: 'مجمع ابن تيمية القرآني',
@@ -85,8 +87,28 @@ const regLink = () => appBase() + '?reg=1' + (S.server ? '&s=' + encodeURICompon
 const parentLink = st => appBase() + '?p=' + st.parentToken + (S.server ? '&s=' + encodeURIComponent(S.server) : '');
 
 /* ——— الوصول للبيانات ——— */
-const T = t => S.data[t];
-const byId = (t, id) => S.data[t].find(x => x.id === id);
+/* ——— الأعوام الدراسية: كل عام يغطي فترة تواريخ، والأعوام المغلقة تُعرض للاطلاع فقط ——— */
+const curYear = () => String(S.settings.year || '1448');
+const allYears = () => (S.settings.years || []).map(y => y.name).concat([curYear()]);
+const viewingArchive = () => !!(S.viewYear && S.viewYear !== curYear());
+function yearRange(name) {
+  const ys = S.settings.years || [];
+  if (!name || name === curYear()) { const last = ys[ys.length - 1]; return [last ? addDays(last.to, 1) : '', '']; }
+  const i = ys.findIndex(y => y.name === name); if (i < 0) return ['', ''];
+  return [i > 0 ? addDays(ys[i - 1].to, 1) : '', ys[i].to];
+}
+const T = t => {
+  const a = S.data[t];
+  if (t === 'records' || t === 'payments') { const [f, to] = yearRange(S.viewYear); if (!f && !to) return a; return a.filter(x => (!f || x.date >= f) && (!to || x.date <= to)); }
+  if (viewingArchive()) {
+    const y = S.viewYear;
+    if (t === 'students') return a.filter(s => s.history && s.history[y]).map(s => Object.assign({}, s, s.history[y], { status: 'active' }));
+    if (t === 'classes') { const m = {}; a.forEach(s => {}); S.data.students.forEach(s => { const h = s.history && s.history[y]; if (h && h.classId && !m[h.classId]) { const c = S.data.classes.find(c => c.id === h.classId); m[h.classId] = Object.assign({ subjects: ['quran', 'noor', 'zad'] }, c || {}, { id: h.classId, name: h.className || (c || {}).name || '', teacherId: h.teacherId || (c || {}).teacherId }); } }); return Object.values(m); }
+  }
+  return a;
+};
+const byId = (t, id) => (viewingArchive() && (t === 'students' || t === 'classes') ? T(t) : S.data[t]).find(x => x.id === id);
+const allRecsOf = sid => S.data.records.filter(r => r.studentId === sid).sort((a, b) => a.date < b.date ? -1 : 1);
 const activeStudents = () => T('students').filter(s => s.status === 'active');
 const classOf = st => st && byId('classes', st.classId);
 const teacherOf = cls => cls && byId('users', cls.teacherId);
@@ -106,6 +128,8 @@ function recsOf(sid, from, to) { return T('records').filter(r => r.studentId ===
 function queue() { try { return JSON.parse(localStorage.getItem(LS.queue) || '[]'); } catch (e) { return []; } }
 function setQueue(q) { localStorage.setItem(LS.queue, JSON.stringify(q)); updateSyncBadge(); }
 function save(table, obj, silent) {
+  if (viewingArchive() && !obj._force) { toast('🔒 العام ' + S.viewYear + ' مغلق — للعرض فقط'); return obj; }
+  delete obj._force;
   obj.updatedAt = Date.now();
   if (S.me) obj.by = S.me.name;
   const arr = S.data[table]; const i = arr.findIndex(x => x.id === obj.id);
@@ -116,6 +140,7 @@ function save(table, obj, silent) {
 }
 function saveMany(table, rows) { rows.forEach(r => save(table, r, true)); }
 function remove(table, id) {
+  if (viewingArchive()) { toast('🔒 العام ' + S.viewYear + ' مغلق — للعرض فقط'); return; }
   S.data[table] = S.data[table].filter(x => x.id !== id); persist();
   if (!isLocal()) { const q = queue().filter(x => !(x.op === 'save' && x.table === table && x.row.id === id)); q.push({ op: 'del', table, id }); setQueue(q); flushSoon(); }
 }

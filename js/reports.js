@@ -77,7 +77,7 @@ function studentReport(s, from, to, periodLbl, subs) {
     const qr = rs.filter(r => (r.hifz && r.hifz.s1) || (r.review && r.review.s1) || r.att === 'a');
     h += `<div class="rep-sec">📖 القرآن الكريم — الحفظ والمراجعة</div>`;
     h += qr.length ? `<table class="tbl"><tr><th>اليوم</th><th>التاريخ</th><th>الحضور</th><th>الحفظ (السورة والآيات)</th><th>أوجه</th><th>التقدير</th><th>المراجعة (السورة والآيات)</th><th>أوجه</th><th>التقدير</th></tr>${qr.map(r => `<tr><td>${dayName(r.date)}</td><td>${fmtDate(r.date, false)}</td>${r.att === 'a' ? '<td colspan="7" style="color:var(--red);font-weight:700">غائب</td>' : `<td>${ATT[r.att] ? ATT[r.att][0] : ''}</td><td class="r">${r.hifz ? Q.rangeText(r.hifz) : '—'}</td><td>${r.hifz ? num(r.hifz.pages) : ''}</td><td>${r.hifz ? gradeLabel(r.hifz.grade) : ''}</td><td class="r">${r.review ? Q.rangeText(r.review) : '—'}</td><td>${r.review ? num(r.review.pages) : ''}</td><td>${r.review ? gradeLabel(r.review.grade) : ''}</td>`}</tr>`).join('')}<tr style="font-weight:800"><td colspan="4">الإجمالي</td><td>${num(o.hifz)}</td><td></td><td></td><td>${num(o.review)}</td><td></td></tr></table>` : '<div class="muted small">لا توجد تسجيلات في هذه الفترة</div>';
-    const memo = memorizedSet(recsOf(s.id)); const prog = surahProgress(memo); const done = prog.map((p, i) => [p, i]).filter(x => x[0] > 0);
+    const memo = memorizedSet(allRecsOf(s.id)); const prog = surahProgress(memo); const done = prog.map((p, i) => [p, i]).filter(x => x[0] > 0);
     if (done.length) h += `<div class="small" style="margin-top:6px"><b>السور المحفوظة حتى الآن (${num(pagesOfSet(memo))} وجه):</b> ${done.map(([p, i]) => Q.names[i] + (p < 1 ? ' (' + Math.round(p * 100) + '%)' : ' ✓')).join('، ')}</div>`;
   }
   if (subs.noor && f.noor) {

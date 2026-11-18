@@ -4,7 +4,7 @@ const ERR_TYPES = ['نسيان', 'خطأ في الحركة', 'خطأ في الح
 let DAY = { cls: '', date: '' };
 
 function classSubjects(c) { const f = features(); return (c && c.subjects || ['quran', 'noor', 'zad']).filter(s => f[s]); }
-function lastRec(sid, before, key) { const rs = T('records').filter(r => r.studentId === sid && r.date < before && r[key] && (key !== 'noor' ? r[key].s1 : r[key].lesson)).sort((a, b) => a.date < b.date ? 1 : -1); return rs[0]; }
+function lastRec(sid, before, key) { const rs = S.data.records.filter(r => r.studentId === sid && r.date < before && r[key] && (key !== 'noor' ? r[key].s1 : r[key].lesson)).sort((a, b) => a.date < b.date ? 1 : -1); return rs[0]; }
 
 function recSummary(r, subj) {
   if (!r) return '<span class="chip gray">لم يُسجَّل</span>';

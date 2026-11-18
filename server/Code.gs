@@ -288,7 +288,7 @@ function route_(r) {
 
 function publicSettings_(s) {
   var keys = ['orgName', 'branchName', 'complexName', 'programName', 'supervisor', 'logoRight', 'logoLeft', 'regClosed', 'regNote',
-    'gradeLabels', 'workDays', 'zad', 'features', 'parentShowFees', 'feeDefault', 'currency', 'phone', 'regFields'];
+    'gradeLabels', 'workDays', 'year', 'years', 'zad', 'features', 'parentShowFees', 'feeDefault', 'currency', 'phone', 'regFields'];
   var o = {}; keys.forEach(function (k) { if (s[k] !== undefined) o[k] = s[k]; });
   return o;
 }

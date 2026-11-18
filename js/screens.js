@@ -22,7 +22,8 @@ function shell(active) {
       <a href="#" id="logout-lnk" style="margin-top:20px;opacity:.8"><span class="ic">🚪</span>${isLocal() ? 'وضع محلي' : 'تسجيل الخروج'}</a></nav></aside>
     <div class="main">
       ${isLocal() ? `<div class="mode-banner no-print">💾 يعمل التطبيق الآن على هذا الجهاز فقط. ليصل المعلمون وأولياء الأمور من أجهزتهم <a href="#/settings/server">اربطه بالخادم من هنا</a></div>` : ''}
-      <div class="topbar"><div><h1>${esc(st.programName)}</h1><div class="who">${S.me ? '👤 ' + esc(S.me.name) + ' · ' : ''}<span id="sync-st"></span></div></div>
+      ${viewingArchive() ? `<div class="mode-banner no-print" style="background:#e4ecfb;color:#24427e">🔒 تعرض الآن بيانات العام الدراسي <b>${esc(S.viewYear)}</b> (مغلق — للعرض والتقارير فقط) <a href="#" id="back-year" style="color:#24427e">↩️ العودة للعام الحالي ${esc(curYear())}</a></div>` : ''}
+      <div class="topbar"><div><h1>${esc(st.programName)} <button class="chip gold" id="year-chip" style="border:0;cursor:pointer;font-size:12px;vertical-align:middle">📅 ${esc(S.viewYear || curYear())}${viewingArchive() ? ' 🔒' : ''}</button></h1><div class="who">${S.me ? '👤 ' + esc(S.me.name) + ' · ' : ''}<span id="sync-st"></span></div></div>
         <div class="logos"><img src="${logoR()}" alt="جمعية تعلم"><img src="${logoL()}" alt="مجمع ابن تيمية"></div></div>
       <div class="content" id="view"></div>
     </div>
@@ -31,6 +32,8 @@ function shell(active) {
 }
 function bindShell() {
   updateSyncBadge();
+  const yc = $('#year-chip'); if (yc) yc.onclick = yearDialog;
+  const by = $('#back-year'); if (by) by.onclick = e => { e.preventDefault(); S.viewYear = ''; render(); };
   const lo = $('#logout-lnk'); if (lo) lo.onclick = async e => { e.preventDefault(); if (isLocal()) { location.hash = '#/settings/server'; return; } if (await confirmBox('تسجيل الخروج من التطبيق؟', 'خروج')) { S.me = null; S.token = null; saveSession(); render(); } };
   const mo = $('#more-lnk'); if (mo) mo.onclick = e => { e.preventDefault(); const m = modal({ title: 'القائمة', body: `<div class="grid g3">${NAV().map(n => `<a class="btn light" style="flex-direction:column;padding:14px" href="#/${n.k}"><span style="font-size:24px">${n.ic}</span>${n.t}</a>`).join('')}</div>`, foot: false }); $$('a', m.body).forEach(a => a.addEventListener('click', () => m.close())); };
 }
@@ -562,7 +565,7 @@ function viewSettings(v, sub) {
   const box = $('#sv'); sub = sub || 'general';
   if (sub === 'general') {
     box.innerHTML = `<div class="card"><h3>🏷️ بيانات البرنامج</h3><div class="grid g2">
-      ${[['orgName', 'اسم الجمعية'], ['branchName', 'الفرع'], ['complexName', 'اسم المجمع'], ['programName', 'اسم البرنامج'], ['supervisor', 'اسم المشرف'], ['phone', 'جوال التواصل'], ['currency', 'العملة']].map(([k, l]) => `<div class="field"><label>${l}</label><input class="inp" data-k="${k}" value="${esc(st[k] || '')}"></div>`).join('')}
+      ${[['year', 'العام الدراسي الحالي'], ['orgName', 'اسم الجمعية'], ['branchName', 'الفرع'], ['complexName', 'اسم المجمع'], ['programName', 'اسم البرنامج'], ['supervisor', 'اسم المشرف'], ['phone', 'جوال التواصل'], ['currency', 'العملة']].map(([k, l]) => `<div class="field"><label>${l}</label><input class="inp" data-k="${k}" value="${esc(st[k] || '')}"></div>`).join('')}
       <div class="field"><label>اتجاه الحفظ الافتراضي للطلاب الجدد</label><select class="inp" data-k="directionDefault"><option value="desc" ${st.directionDefault !== 'asc' ? 'selected' : ''}>من الناس صعوداً</option><option value="asc" ${st.directionDefault === 'asc' ? 'selected' : ''}>من الفاتحة نزولاً</option></select></div></div>
       <div class="field"><label>رسالة ترحيب في نموذج التسجيل</label><textarea class="inp" data-k="regNote">${esc(st.regNote || '')}</textarea></div></div>
     <div class="card"><h3>🖼️ الشعارات</h3><div class="grid g2">${[['logoRight', 'الشعار الأيمن (جمعية تعلم)'], ['logoLeft', 'الشعار الأيسر (مجمع ابن تيمية)']].map(([k, l]) => `<div style="text-align:center"><div class="muted small">${l}</div><img src="${st[k] || DEFAULT_SETTINGS[k]}" style="height:90px;max-width:100%;object-fit:contain;margin:8px"><div class="row" style="justify-content:center"><label class="btn sm light">📁 تغيير<input type="file" accept="image/*" data-logo="${k}" hidden></label><button class="btn sm ghost" data-rl="${k}">↩️ الافتراضي</button></div></div>`).join('')}</div></div>
@@ -706,4 +709,55 @@ async function importPack(file) {
   m.foot && (m.foot.innerHTML = '');
   $('#pk-log', m.el).insertAdjacentHTML('afterend', '<div class="row" style="margin-top:12px"><a class="btn" href="#/students">👦 الطلاب</a><a class="btn light" href="#/fees">💰 الرسوم</a><a class="btn light" href="#/classes">🏫 الفصول</a></div>');
   flush();
+}
+
+/* ===================== الأعوام الدراسية ===================== */
+function yearStats(name) {
+  const keep = S.viewYear; S.viewYear = name;
+  const st = T('students').filter(s => s.status === 'active'); const recs = T('records'); const pays = T('payments');
+  const o = { students: st.length, classes: T('classes').length, records: recs.length, paid: pays.reduce((a, p) => a + (+p.amount || 0), 0), pages: recs.reduce((a, r) => a + (+(r.hifz || {}).pages || 0), 0) };
+  S.viewYear = keep; return o;
+}
+function yearDialog() {
+  const ys = S.settings.years || []; const cur = curYear();
+  const rows = ys.map(y => ({ name: y.name, from: yearRange(y.name)[0], to: y.to, closed: true })).concat([{ name: cur, from: yearRange(cur)[0], to: '', closed: false }]).reverse();
+  const m = modal({ title: '📅 الأعوام الدراسية', body: `${rows.map(y => { const o = yearStats(y.name); return `<div class="card" style="margin-bottom:8px;${(S.viewYear || cur) === y.name ? 'border:2px solid var(--gold)' : ''}"><div class="row"><b style="font-size:17px;flex:1">العام ${esc(y.name)} ${y.closed ? '<span class="chip gray">🔒 مغلق</span>' : '<span class="chip green">الحالي</span>'}</b><button class="btn sm ${y.closed ? 'light' : ''}" data-view="${esc(y.name)}">👁️ عرض</button></div>
+      <div class="small muted" style="margin-top:4px">${y.from ? 'من ' + fmtDate(y.from, false) : 'من البداية'}${y.to ? ' إلى ' + fmtDate(y.to, false) : ' — مستمر'}</div>
+      <div class="row small" style="margin-top:6px"><span class="chip">👦 ${o.students} طالب</span><span class="chip">🏫 ${o.classes} فصل</span><span class="chip">📖 ${num(o.pages)} وجه حفظ</span><span class="chip gold">💰 ${num(o.paid)} ${S.settings.currency}</span></div></div>`; }).join('')}
+    ${isAdmin() && !viewingArchive() ? `<div class="card" style="background:#fff8e1"><h3>🔐 إغلاق العام ${esc(cur)} وبدء عام جديد</h3><p class="small">يُحفظ كل ما في العام الحالي كما هو (الطلاب وفصولهم ومعلموهم، الحفظ والمراجعة والنورانية وزاد الطفل، الغياب، الرسوم والإيصالات) ويمكن الرجوع إليه وطباعة تقاريره في أي وقت. ويبدأ العام الجديد بسجل متابعة ورسوم جديدة، مع بقاء خريطة الحفظ ومسار النورانية لكل طالب متصلة.</p><button class="btn red" id="close-year">🔐 إغلاق العام ${esc(cur)}</button></div>` : ''}`, foot: false });
+  m.body.onclick = e => { const v = e.target.closest('[data-view]'); if (v) { S.viewYear = v.dataset.view === cur ? '' : v.dataset.view; m.close(); render(); } };
+  const cy = $('#close-year', m.el); if (cy) cy.onclick = () => { m.close(); closeYearDialog(); };
+}
+function closeYearDialog() {
+  const cur = curYear(); const guess = /^\d+$/.test(cur) ? String(+cur + 1) : '';
+  const act = T('students').filter(s => s.status === 'active');
+  const m = modal({ title: '🔐 إغلاق العام الدراسي ' + esc(cur), body: `
+    <div class="grid g2"><div class="field"><label>آخر يوم في العام ${esc(cur)}</label><input class="inp" type="date" id="cy-to" value="${todayISO()}"></div>
+    <div class="field"><label>اسم العام الجديد</label><input class="inp" id="cy-new" value="${esc(guess)}"></div>
+    <div class="field"><label>رسوم العام الجديد لكل طالب (${S.settings.currency})</label><input class="inp" type="number" id="cy-fee" value="${S.settings.feeDefault || 0}"></div></div>
+    <div class="field"><label>الطلاب الحاليون (${act.length})</label>
+      <label class="row"><input type="radio" name="cy-st" value="keep" checked> يستمرون في العام الجديد بنفس فصولهم ومعلميهم (يمكن نقلهم لاحقاً)</label>
+      <label class="row"><input type="radio" name="cy-st" value="pending"> يحتاجون إعادة تسجيل: ينتقلون إلى «بانتظار التفعيل»</label></div>
+    <div class="card small" style="background:#f3faf8">✔️ ستُنزَّل نسخة احتياطية كاملة على جهازك قبل الإغلاق.<br>✔️ سجلات العام ${esc(cur)} ورسومه تبقى محفوظة وتظهر من زر 📅 أعلى الصفحة.</div>
+    <div class="field"><label>للتأكيد اكتب اسم العام الذي سيُغلق: <b>${esc(cur)}</b></label><input class="inp" id="cy-ok"></div>`,
+    foot: '<button class="btn red" data-ok>🔐 إغلاق العام وبدء العام الجديد</button>' });
+  $('[data-ok]', m.el).onclick = async () => {
+    const to = $('#cy-to', m.el).value, nw = $('#cy-new', m.el).value.trim(), fee = +$('#cy-fee', m.el).value || 0, mode = $('[name=cy-st]:checked', m.el).value;
+    if ($('#cy-ok', m.el).value.trim() !== cur) return toast('اكتب اسم العام ' + cur + ' للتأكيد');
+    if (!nw || allYears().includes(nw)) return toast('اكتب اسماً جديداً للعام');
+    const [from] = yearRange(cur); if (from && to < from) return toast('التاريخ قبل بداية العام');
+    if (T('records').some(r => r.date > to) || T('payments').some(p => p.date > to)) { if (!await confirmBox('توجد تسجيلات بعد ' + fmtDate(to, false) + ' ستنتقل للعام الجديد. متابعة؟', 'متابعة', false)) return; }
+    // نسخة احتياطية
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(S.data)], { type: 'application/json' })); a.download = 'نسخة-قبل-إغلاق-العام-' + cur + '.json'; a.click();
+    // لقطة كل طالب في العام المغلق
+    S.data.students.filter(s => s.status === 'active' || s.status === 'archived').forEach(s => {
+      if (s.status !== 'active' && !T('records').some(r => r.studentId === s.id)) return;
+      const c = S.data.classes.find(c => c.id === s.classId); const t = c && S.data.users.find(u => u.id === c.teacherId);
+      s.history = Object.assign({}, s.history || {}, { [cur]: { classId: s.classId || '', className: c ? c.name : '', teacherId: c ? c.teacherId : '', teacherName: t ? t.name : '', fee: feeOf(s), paid: paidOf(s) } });
+      if (s.status === 'active') { s.fee = ''; if (mode === 'pending') s.status = 'pending'; }
+      save('students', s);
+    });
+    saveSettings({ years: (S.settings.years || []).concat([{ name: cur, to, closedAt: Date.now() }]), year: nw, feeDefault: fee });
+    m.close(); S.viewYear = ''; toast('✔️ أُغلق العام ' + cur + ' وبدأ العام ' + nw, 4000); location.hash = '#/home'; render();
+  };
 }

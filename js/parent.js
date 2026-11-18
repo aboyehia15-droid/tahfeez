@@ -29,12 +29,12 @@ function drawParent(root, s) {
   const st = S.settings; const f = features(); const c = classOf(s); const t = teacherOf(c);
   const subj = classSubjects(c);
   const [from, to] = periodRange(PV.k, todayISO(), PV.f, PV.t);
-  const o = statsOf(s.id, from, to); const all = recsOf(s.id);
+  const o = statsOf(s.id, from, to); const all = recsOf(s.id); const cumul = allRecsOf(s.id);
   const rk = c && st.parentShowRank !== false ? rankClass(c.id, from, to).find(x => x.s.id === s.id) : null;
   const lbl = { day: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', custom: 'الفترة المحددة', all: 'منذ البداية' }[PV.k];
   const today = getRec(s.id, todayISO());
-  const memo = memorizedSet(all); const prog = surahProgress(memo); const memPages = pagesOfSet(memo);
-  const lastNoor = all.filter(r => r.noor && r.noor.lesson).pop();
+  const memo = memorizedSet(cumul); const prog = surahProgress(memo); const memPages = pagesOfSet(memo);
+  const lastNoor = cumul.filter(r => r.noor && r.noor.lesson).pop();
   const zadAll = all.flatMap(r => r.zad || []);
   const pays = T('payments').filter(p => p.studentId === s.id).sort((a, b) => a.date < b.date ? 1 : -1);
   const fee = feeOf(s), paid = paidOf(s);
