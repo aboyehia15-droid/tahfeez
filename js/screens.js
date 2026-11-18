@@ -593,7 +593,11 @@ function serverSettings(box) {
           S.server = url; localStorage.setItem(LS.server, url); S.token = b.token; S.me = b.user; saveSession(); await pull(true); toast('✔️ تم الربط'); location.hash = '#/home';
         };
       } else { S.server = url; localStorage.setItem(LS.server, url); toast('سجّل الدخول'); render(); }
-    } catch (e) { toast('⚠️ تعذر الاتصال: ' + e.message); }
+    } catch (e) {
+      let why = 'تعذر الاتصال بالخادم.';
+      try { const t = await (await fetch(url, { redirect: 'follow' })).text(); if (/"app":"tahfeez"/.test(t)) why = 'الخادم يعمل لكن رفض الطلب: ' + e.message; else if (/accounts\.google|ServiceLogin|signin/i.test(t)) why = 'الخادم يطلب تسجيل دخول Google ← اجعل «من يمكنه الوصول» = أي شخص (Anyone) وانشر إصداراً جديداً.'; else if (/doGet|Script function not found/i.test(t)) why = 'الكود غير محفوظ أو غير منشور ← احفظ الكود ثم انشر إصداراً جديداً.'; else why = 'الرد غير متوقع: ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160); } catch (e2) { why = 'لا يمكن الوصول للرابط (' + e.message + ') ← غالباً «من يمكنه الوصول» ليس «أي شخص»، أو الرابط منسوخ ناقصاً.'; }
+      $('#sres').innerHTML = `<div class="card" style="background:#fde4e7;margin-top:10px"><b>⚠️ ${esc(why)}</b><div class="small" style="margin-top:6px">للتأكد: افتح <a href="${esc(url)}" target="_blank">رابط الخادم</a> في المتصفح — إن كان سليماً ستظهر عبارة فيها <span dir="ltr">"ok":true,"app":"tahfeez"</span></div></div>`;
+    }
     cb.disabled = false; cb.textContent = '🔗 ربط';
   };
 }
