@@ -638,11 +638,12 @@ function viewSettings(v, sub) {
   if (sub === 'features') {
     box.innerHTML = `<div class="card"><h3>🎛️ تشغيل وإيقاف الخصائص</h3>${FEATS.map(([k, t]) => `<div class="toggle-row"><span>${t}</span><label class="switch"><input type="checkbox" data-f="${k}" ${f[k] ? 'checked' : ''}><span></span></label></div>`).join('')}
       <div class="toggle-row"><span>إظهار الرسوم لولي الأمر في صفحة الطالب</span><label class="switch"><input type="checkbox" id="psf" ${st.parentShowFees !== false ? 'checked' : ''}><span></span></label></div>
+      <div class="toggle-row"><span>إظهار الإعفاء والخصومات (أخوة / خاص) لولي الأمر <span class="small muted">— عند الإيقاف يرى المبلغ المستحق فقط</span></span><label class="switch"><input type="checkbox" id="psd" ${st.parentShowDisc ? 'checked' : ''}><span></span></label></div>
       <div class="toggle-row"><span>عرض ترتيب الطالب في فصله لولي الأمر</span><label class="switch"><input type="checkbox" id="psr" ${st.parentShowRank !== false ? 'checked' : ''}><span></span></label></div></div>
       <div class="card"><h3>📲 مزود الواتساب للإرسال الآلي (اختياري)</h3><p class="small muted">بدونه يعمل الإرسال بفتح الواتساب برسالة جاهزة لكل رقم. للإرسال الآلي الكامل اشترك في خدمة UltraMsg ثم ضع البيانات هنا (تعمل بعد الربط بالخادم).</p>
       <div class="grid g2"><div class="field"><label>Instance ID</label><input class="inp" id="wai" dir="ltr" value="${esc(st.waInstance || '')}"></div><div class="field"><label>Token</label><input class="inp" id="wat" dir="ltr" value="${esc(st.waToken || '')}"></div></div>
       <div class="toggle-row"><span>تفعيل الإرسال الآلي</span><label class="switch"><input type="checkbox" id="waa" ${st.waAuto ? 'checked' : ''}><span></span></label></div></div>`;
-    box.onchange = () => { const fe = {}; $$('[data-f]', box).forEach(i => fe[i.dataset.f] = i.checked); saveSettings({ features: fe, parentShowFees: $('#psf').checked, parentShowRank: $('#psr').checked, waInstance: $('#wai').value.trim(), waToken: $('#wat').value.trim(), waAuto: $('#waa').checked }); toast('✔️ حُفظ'); };
+    box.onchange = () => { const fe = {}; $$('[data-f]', box).forEach(i => fe[i.dataset.f] = i.checked); saveSettings({ features: fe, parentShowFees: $('#psf').checked, parentShowRank: $('#psr').checked, parentShowDisc: $('#psd').checked, waInstance: $('#wai').value.trim(), waToken: $('#wat').value.trim(), waAuto: $('#waa').checked }); toast('✔️ حُفظ'); };
   }
   if (sub === 'zad') {
     const z = zadCurriculum();
