@@ -3,7 +3,7 @@ const ATT = { p: ['حاضر', 'p'], a: ['غائب', 'a'], l: ['متأخر', 'l']
 const ERR_TYPES = ['نسيان', 'خطأ في الحركة', 'خطأ في الحرف', 'تجويد', 'تردد', 'تلقين', 'خلط بين الآيات'];
 let DAY = { cls: '', date: '' };
 
-function classSubjects(c) { const f = features(); return (c && c.subjects || ['quran', 'noor', 'zad']).filter(s => f[s]); }
+function classSubjects(c) { const f = features(); return (c && c.subjects || ['quran', 'noor', 'zad']).filter(s => isCur(s) || f[s]); }
 function lastRec(sid, before, key) { const rs = S.data.records.filter(r => r.studentId === sid && r.date < before && r[key] && (key !== 'noor' ? r[key].s1 : r[key].lesson)).sort((a, b) => a.date < b.date ? 1 : -1); return rs[0]; }
 
 function recSummary(r, subj) {
@@ -13,6 +13,8 @@ function recSummary(r, subj) {
   const out = [];
   if (subj.includes('quran') && r.hifz && r.hifz.s1) out.push(`<span class="chip">📖 ${Q.rangeText(r.hifz)} · ${num(r.hifz.pages)}و</span>${gradeChip(r.hifz.grade)}`);
   if (subj.includes('quran') && r.review && r.review.s1) out.push(`<span class="chip blue">🔁 ${Q.rangeText(r.review)} · ${num(r.review.pages)}و</span>${gradeChip(r.review.grade)}`);
+  if (subj.includes('quran') && r.far && r.far.s1) out.push(`<span class="chip" style="background:#efe7fb;color:#5b3fb0">🕰️ ${Q.rangeText(r.far)} · ${num(r.far.pages)}و</span>${gradeChip(r.far.grade)}`);
+  subj.filter(isCur).forEach(cid => { const x = (r.cur || {})[cid]; if (x && x.lesson) out.push(curChip(cid, x)); });
   if (subj.includes('noor') && r.noor && r.noor.lesson) out.push(`<span class="chip gold">🔤 د${r.noor.lesson}${r.noor.from ? ' (' + r.noor.from + '–' + r.noor.to + ')' : ''}</span>${gradeChip(r.noor.grade)}`);
   if (subj.includes('zad') && r.zad && r.zad.length) out.push(`<span class="chip" style="background:#fbe7ee;color:#a3325a">🌸 ${r.zad.length} من زاد الطفل</span>`);
   if (r.errors && r.errors.length) out.push(`<span class="chip red">✏️ ${r.errors.filter(e => !e.fixed).length}/${r.errors.length} خطأ</span>`);
@@ -27,6 +29,8 @@ function dailySummaryText(r) {
   if (r.att === 'l') L.push('⏰ متأخر');
   if (r.hifz && r.hifz.s1) L.push('📖 الحفظ: ' + Q.rangeText(r.hifz) + (r.hifz.grade ? ' — ' + gradeLabel(r.hifz.grade) : ''));
   if (r.review && r.review.s1) L.push('🔁 المراجعة: ' + Q.rangeText(r.review) + (r.review.grade ? ' — ' + gradeLabel(r.review.grade) : ''));
+  if (r.far && r.far.s1) L.push('🕰️ المراجعة البعيدة: ' + Q.rangeText(r.far) + (r.far.grade ? ' — ' + gradeLabel(r.far.grade) : ''));
+  Object.keys(r.cur || {}).forEach(cid => { const t = curLine(cid, r.cur[cid]); if (t) L.push(t); });
   if (r.noor && r.noor.lesson) L.push('🔤 النورانية: ' + NOORANIA[r.noor.lesson - 1].title + (r.noor.grade ? ' — ' + gradeLabel(r.noor.grade) : ''));
   (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat); L.push('🌸 ' + (c ? c.name : '') + ': ' + z.item + (z.grade ? ' — ' + gradeLabel(z.grade) : '')); });
   const errs = (r.errors || []).filter(e => !e.fixed); if (errs.length) L.push('✏️ أخطاء تحتاج مراجعة: ' + errs.length);
@@ -44,7 +48,7 @@ function viewDaily(v, sub) {
   const list = studentsOfClass(DAY.cls);
   const recs = list.map(s => getRec(s.id, DAY.date));
   const pres = recs.filter(r => r && (r.att === 'p' || r.att === 'l')).length, abs = recs.filter(r => r && r.att === 'a').length;
-  const pages = recs.reduce((a, r) => a + (r ? (+(r.hifz || {}).pages || 0) + (+(r.review || {}).pages || 0) : 0), 0);
+  const pages = recs.reduce((a, r) => a + (r ? (+(r.hifz || {}).pages || 0) + (+(r.review || {}).pages || 0) + (+(r.far || {}).pages || 0) : 0), 0);
   const isWork = (S.settings.workDays || []).includes(parseISO(DAY.date).getDay());
   v.innerHTML = `
     <div class="daybar">
@@ -81,7 +85,7 @@ function recordEditor(s, date) {
   const c = classOf(s); const subj = classSubjects(c); const f = features();
   const orig = getRec(s.id, date);
   const r = JSON.parse(JSON.stringify(orig || newRec(s, date)));
-  r.classId = s.classId; r.errors = r.errors || []; r.zad = r.zad || [];
+  r.classId = s.classId; r.errors = r.errors || []; r.zad = r.zad || []; r.cur = r.cur || {};
   if (!r.att) r.att = 'p';
   const body = document.createElement('div');
   const list = studentsOfClass(s.classId); const idx = list.findIndex(x => x.id === s.id); const next = list[idx + 1];
@@ -97,10 +101,13 @@ function recordEditor(s, date) {
     if (r.att === 'a' || r.att === 'e') { eb.innerHTML = `<div class="sec">${r.att === 'a' ? '❌ الطالب غائب' : 'ℹ️ الطالب مستأذن'} — <span class="muted">لا يُسجَّل له حفظ أو مراجعة.</span><div class="field" style="margin-top:8px"><label>ملاحظة (اختياري)</label><textarea class="inp" id="enote">${esc(r.note || '')}</textarea></div></div>`; $('#enote', eb).oninput = e => r.note = e.target.value; return; }
     let h = '';
     if (subj.includes('quran')) {
-      const lh = lastRec(s.id, date, 'hifz'), lr = lastRec(s.id, date, 'review');
+      const lh = lastRec(s.id, date, 'hifz'), lr = lastRec(s.id, date, 'review'), lf = lastRec(s.id, date, 'far');
       const sugH = lh ? suggestNext(lh.hifz, s.direction || S.settings.directionDefault) : null;
-      h += sec('hifz', '📖 الحفظ الجديد', `${lh ? `<div class="small muted" style="margin-bottom:6px">آخر حفظ (${fmtDate(lh.date, false)}): <b>${Q.rangeText(lh.hifz)}</b> ${gradeChip(lh.hifz.grade)}${sugH && !(r.hifz && r.hifz.s1) ? ` <button class="btn sm gold" data-sug="hifz">↩️ متابعة: ${Q.rangeText(sugH)}</button>` : ''}</div>` : ''}<div data-rp="hifz"></div><div class="voice-text" data-vt="hifz" hidden></div><div style="margin-top:8px">${gradeButtons((r.hifz || {}).grade, 'hifz')}</div><div data-ab="hifz"></div>`, true);
-      h += sec('review', '🔁 المراجعة', `${lr ? `<div class="small muted" style="margin-bottom:6px">آخر مراجعة (${fmtDate(lr.date, false)}): <b>${Q.rangeText(lr.review)}</b>${!(r.review && r.review.s1) ? ` <button class="btn sm light" data-sug="review">↩️ نفس المقطع</button>` : ''}${lh && !(r.review && r.review.s1) ? ` <button class="btn sm light" data-sug="review-h">📖 مراجعة آخر حفظ</button>` : ''}</div>` : ''}<div data-rp="review"></div><div class="voice-text" data-vt="review" hidden></div><div style="margin-top:8px">${gradeButtons((r.review || {}).grade, 'review')}</div><div data-ab="review"></div>`, true);
+      const memo = memorizedSet(allRecsOf(s.id).filter(x => x.date < date)); const prog = surahProgress(memo);
+      const memChips = k => { const done = JUZ_LIST.flatMap(j => j.surahs).filter(n => prog[n - 1] > 0); return done.length ? `<div class="small" style="margin:6px 0"><span class="muted">${k === 'hifz' ? 'السور المحفوظة سابقاً:' : 'اختر من محفوظه:'}</span> ${done.map(n => `<button type="button" class="chip ${prog[n - 1] >= 1 ? '' : 'gold'}" style="border:0;cursor:pointer;margin:2px" data-msur="${k}|${n}" title="${Math.round(prog[n - 1] * 100)}%">${Q.names[n - 1]}${prog[n - 1] < 1 ? ' ½' : ''}</button>`).join('')}</div>` : ''; };
+      h += sec('hifz', '📖 الحفظ الجديد', `${lh ? `<div class="small muted" style="margin-bottom:6px">آخر حفظ (${fmtDate(lh.date, false)}): <b>${Q.rangeText(lh.hifz)}</b> ${gradeChip(lh.hifz.grade)}${sugH && !(r.hifz && r.hifz.s1) ? ` <button class="btn sm gold" data-sug="hifz">↩️ متابعة: ${Q.rangeText(sugH)}</button>` : ''}</div>` : ''}<div data-rp="hifz"></div>${memChips('hifz')}<div class="voice-text" data-vt="hifz" hidden></div><div style="margin-top:8px">${gradeButtons((r.hifz || {}).grade, 'hifz')}</div><div data-ab="hifz"></div>`, true);
+      h += sec('review', '🔁 المراجعة القريبة', `${lr ? `<div class="small muted" style="margin-bottom:6px">آخر مراجعة (${fmtDate(lr.date, false)}): <b>${Q.rangeText(lr.review)}</b>${!(r.review && r.review.s1) ? ` <button class="btn sm light" data-sug="review">↩️ نفس المقطع</button>` : ''}${lh && !(r.review && r.review.s1) ? ` <button class="btn sm light" data-sug="review-h">📖 مراجعة آخر حفظ</button>` : ''}</div>` : ''}<div data-rp="review"></div>${memChips('review')}<div class="voice-text" data-vt="review" hidden></div><div style="margin-top:8px">${gradeButtons((r.review || {}).grade, 'review')}</div><div data-ab="review"></div>`, true);
+      h += sec('far', '🕰️ المراجعة البعيدة', `${lf ? `<div class="small muted" style="margin-bottom:6px">آخر مراجعة بعيدة (${fmtDate(lf.date, false)}): <b>${Q.rangeText(lf.far)}</b>${!(r.far && r.far.s1) ? ` <button class="btn sm light" data-sug="far">↩️ ما بعدها</button>` : ''}</div>` : ''}<div data-rp="far"></div>${memChips('far')}<div class="voice-text" data-vt="far" hidden></div><div style="margin-top:8px">${gradeButtons((r.far || {}).grade, 'far')}</div><div data-ab="far"></div>`, true);
     }
     if (subj.includes('noor')) {
       const ln = lastRec(s.id, date, 'noor'); r.noor = r.noor || {};
@@ -111,12 +118,13 @@ function recordEditor(s, date) {
     if (subj.includes('zad')) {
       h += sec('zad', '🌸 زاد الطفل المسلم', zadCurriculum().map(cat => { const cur = r.zad.filter(z => z.cat === cat.id); return `<div class="zad-cat"><div class="t"><span>${cat.icon}</span>${esc(cat.name)}<span style="flex:1"></span><select class="inp" data-zadd="${cat.id}" style="width:auto;max-width:60%;font-size:13px"><option value="">➕ إضافة بند…</option>${cat.items.map(it => `<option>${esc(it)}</option>`).join('')}</select></div>${cur.map(z => `<div class="row" style="margin:4px 0"><span style="flex:1;min-width:120px">• ${esc(z.item)}</span>${gradeButtons(z.grade, 'zad|' + cat.id + '|' + z.item).replace('class="grades"', 'class="grades" style="flex:2"')}<button class="btn sm ghost" data-zdel="${cat.id}|${esc(z.item)}">✕</button></div>`).join('')}</div>`; }).join(''));
     }
+    subj.filter(isCur).forEach(cid => { h += curEditorHTML(cid, r.cur[cid], s.id, date); });
     h += sec('errs', '✏️ الأخطاء والتصويب', `<div class="small muted" style="margin-bottom:6px">${subj.includes('quran') ? 'في جزء عم: اضغط على الكلمة الخاطئة في نص الآيات أعلاه لتسجيلها. ' : ''}أو أضف الخطأ يدوياً:</div><div class="err-list" id="elist"></div><button class="btn sm light" id="eadd">➕ إضافة خطأ</button>`);
     h += sec('note', '📝 ملاحظات المعلم', `${f.behavior ? `<div class="row" style="margin-bottom:8px"><span>السلوك والانضباط:</span><span id="beh">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-b="${n}" style="border:0;background:none;font-size:26px;cursor:pointer;color:${(r.behavior || 0) >= n ? '#e2b93b' : '#ddd'}">★</button>`).join('')}</span></div>` : ''}<textarea class="inp" id="enote" placeholder="ملاحظة تظهر لولي الأمر في صفحة الطالب">${esc(r.note || '')}</textarea>
       <div class="row small" style="margin-top:6px">${['أحسنت، ممتاز 👏', 'يحتاج مراجعة في البيت', 'تحسن ملحوظ', 'يحتاج تركيزاً أكثر', 'نرجو الحرص على الحضور مبكراً'].map(t => `<button type="button" class="chip" data-qn="${t}" style="border:0;cursor:pointer">${t}</button>`).join('')}</div>`);
     eb.innerHTML = h;
     // مكونات اختيار المقطع
-    ['hifz', 'review'].forEach(k => {
+    ['hifz', 'review', 'far'].forEach(k => {
       const host = $(`[data-rp="${k}"]`, eb); if (!host) return;
       r[k] = r[k] || {};
       const rp = rangePicker(r[k], rr => { r[k] = Object.assign(r[k], rr); drawAyahs(k); });
@@ -124,7 +132,8 @@ function recordEditor(s, date) {
     });
     drawNoor(); drawErrs();
     bindGrades(eb, (name, g) => {
-      if (name === 'hifz' || name === 'review') { r[name] = r[name] || {}; r[name].grade = g; }
+      if (name === 'hifz' || name === 'review' || name === 'far') { r[name] = r[name] || {}; r[name].grade = g; }
+      else if (name.startsWith('cur|')) { const cid = name.slice(4); r.cur[cid] = r.cur[cid] || {}; r.cur[cid].grade = g; }
       else if (name === 'noor') r.noor.grade = g;
       else if (name.startsWith('zad|')) { const [, cat, item] = name.split('|'); const z = r.zad.find(z => z.cat === cat && z.item === item); if (z) z.grade = g; }
     });
@@ -153,15 +162,15 @@ function recordEditor(s, date) {
   }
   function drawErrs() {
     const host = $('#elist', eb); if (!host) return;
-    host.innerHTML = r.errors.map((e, i) => { const where = e.sub === 'noor' ? `النورانية د${e.lesson}: «${esc(e.word || e.item)}»` : e.sub === 'zad' ? 'زاد الطفل' : `${e.sub === 'review' ? 'مراجعة' : 'حفظ'} — ${Q.names[e.s - 1] || ''} ${e.a || ''}${e.word ? ': «' + esc(e.word) + '»' : ''}`; return `<div class="e ${e.fixed ? 'fixed' : ''}"><div style="flex:1"><div class="small"><b>${where}</b></div><div class="row" style="margin-top:4px"><select class="inp" data-et="${i}" style="width:auto;font-size:12px;padding:5px">${ERR_TYPES.map(t => `<option ${e.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><input class="inp grow" data-en="${i}" placeholder="التصويب / ملاحظة" value="${esc(e.note || '')}" style="font-size:13px;padding:6px"></div></div><label class="small row" style="white-space:nowrap"><input type="checkbox" data-ef="${i}" ${e.fixed ? 'checked' : ''}> صُوِّب</label><button type="button" class="btn sm ghost" data-ed="${i}">✕</button></div>`; }).join('') || '<div class="small muted">لا توجد أخطاء مسجلة ✨</div>';
+    host.innerHTML = r.errors.map((e, i) => { const where = e.sub === 'noor' ? `النورانية د${e.lesson}: «${esc(e.word || e.item)}»` : e.sub === 'zad' ? 'زاد الطفل' : `${e.sub === 'review' ? 'مراجعة' : e.sub === 'far' ? 'مراجعة بعيدة' : 'حفظ'} — ${Q.names[e.s - 1] || ''} ${e.a || ''}${e.word ? ': «' + esc(e.word) + '»' : ''}`; return `<div class="e ${e.fixed ? 'fixed' : ''}"><div style="flex:1"><div class="small"><b>${where}</b></div><div class="row" style="margin-top:4px"><select class="inp" data-et="${i}" style="width:auto;font-size:12px;padding:5px">${ERR_TYPES.map(t => `<option ${e.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><input class="inp grow" data-en="${i}" placeholder="التصويب / ملاحظة" value="${esc(e.note || '')}" style="font-size:13px;padding:6px"></div></div><label class="small row" style="white-space:nowrap"><input type="checkbox" data-ef="${i}" ${e.fixed ? 'checked' : ''}> صُوِّب</label><button type="button" class="btn sm ghost" data-ed="${i}">✕</button></div>`; }).join('') || '<div class="small muted">لا توجد أخطاء مسجلة ✨</div>';
     host.oninput = e => { const t = e.target; if (t.dataset.et) r.errors[+t.dataset.et].type = t.value; if (t.dataset.en) r.errors[+t.dataset.en].note = t.value; };
-    host.onchange = e => { const t = e.target; if (t.dataset.ef) { r.errors[+t.dataset.ef].fixed = t.checked; drawErrs(); ['hifz', 'review'].forEach(drawAyahs); drawNoor(); } };
-    host.onclick = e => { const d = e.target.closest('[data-ed]'); if (d) { r.errors.splice(+d.dataset.ed, 1); drawErrs(); ['hifz', 'review'].forEach(drawAyahs); drawNoor(); } };
+    host.onchange = e => { const t = e.target; if (t.dataset.ef) { r.errors[+t.dataset.ef].fixed = t.checked; drawErrs(); ['hifz', 'review', 'far'].forEach(drawAyahs); drawNoor(); } };
+    host.onclick = e => { const d = e.target.closest('[data-ed]'); if (d) { r.errors.splice(+d.dataset.ed, 1); drawErrs(); ['hifz', 'review', 'far'].forEach(drawAyahs); drawNoor(); } };
   }
   function addErrorManual() {
-    const subs = []; if (subj.includes('quran')) subs.push(['hifz', 'الحفظ'], ['review', 'المراجعة']); if (subj.includes('noor')) subs.push(['noor', 'النورانية']); if (subj.includes('zad')) subs.push(['zad', 'زاد الطفل']);
+    const subs = []; if (subj.includes('quran')) subs.push(['hifz', 'الحفظ'], ['review', 'المراجعة'], ['far', 'المراجعة البعيدة']); if (subj.includes('noor')) subs.push(['noor', 'النورانية']); if (subj.includes('zad')) subs.push(['zad', 'زاد الطفل']);
     const mm = modal({ title: 'إضافة خطأ', body: `<div class="field"><label>المادة</label><select class="inp" id="xs">${subs.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></div><div id="xw"></div><div class="field"><label>نوع الخطأ</label><select class="inp" id="xt">${ERR_TYPES.map(t => `<option>${t}</option>`).join('')}</select></div><div class="field"><label>الخطأ والتصويب</label><input class="inp" id="xn" placeholder="مثال: قرأ «الرحيم» بدل «الرحمن»"></div>`, foot: '<button class="btn" data-ok>إضافة</button>' });
-    const dw = () => { const k = $('#xs', mm.el).value; const rg = r[k]; if ((k === 'hifz' || k === 'review') && rg && rg.s1) { const set = Q.ayahSet(rg); $('#xw', mm.el).innerHTML = `<div class="field"><label>الآية</label><select class="inp" id="xa">${set.map(kk => { const [ss, aa] = Q.absToSA(kk); return `<option value="${ss}|${aa}">${Q.names[ss - 1]} ${aa}</option>`; }).join('')}</select></div>`; } else $('#xw', mm.el).innerHTML = ''; };
+    const dw = () => { const k = $('#xs', mm.el).value; const rg = r[k]; if ((k === 'hifz' || k === 'review' || k === 'far') && rg && rg.s1) { const set = Q.ayahSet(rg); $('#xw', mm.el).innerHTML = `<div class="field"><label>الآية</label><select class="inp" id="xa">${set.map(kk => { const [ss, aa] = Q.absToSA(kk); return `<option value="${ss}|${aa}">${Q.names[ss - 1]} ${aa}</option>`; }).join('')}</select></div>`; } else $('#xw', mm.el).innerHTML = ''; };
     dw(); $('#xs', mm.el).onchange = dw;
     $('[data-ok]', mm.el).onclick = () => { const k = $('#xs', mm.el).value; const e = { id: uid('e'), sub: k, type: $('#xt', mm.el).value, note: $('#xn', mm.el).value }; const xa = $('#xa', mm.el); if (xa) { const [ss, aa] = xa.value.split('|').map(Number); e.s = ss; e.a = aa; } if (k === 'noor') { e.lesson = r.noor.lesson; } r.errors.push(e); mm.close(); drawErrs(); };
   }
@@ -171,6 +180,7 @@ function recordEditor(s, date) {
   eb.addEventListener('change', e => {
     const t = e.target;
     if (t.id === 'nles') { r.noor = { lesson: +t.value || null, grade: r.noor.grade }; drawNoor(); }
+    if (t.dataset.cles) { r.cur[t.dataset.cles] = { lesson: +t.value || null, items: [], errs: [], grade: (r.cur[t.dataset.cles] || {}).grade }; drawBody(); }
     if (t.dataset.zadd) { if (t.value && !r.zad.some(z => z.cat === t.dataset.zadd && z.item === t.value)) r.zad.push({ cat: t.dataset.zadd, item: t.value, grade: 0 }); drawBody(); }
   });
   eb.addEventListener('input', e => { if (e.target.id === 'enote') r.note = e.target.value; });
@@ -181,6 +191,7 @@ function recordEditor(s, date) {
       const k = sg.dataset.sug;
       if (k === 'hifz') { const lh = lastRec(s.id, date, 'hifz'); const sug = suggestNext(lh.hifz, s.direction || S.settings.directionDefault); if (sug) $('[data-rp="hifz"]', eb)._rp.set(sug); sg.remove(); }
       if (k === 'review') { const lr = lastRec(s.id, date, 'review'); $('[data-rp="review"]', eb)._rp.set({ s1: lr.review.s1, a1: lr.review.a1, s2: lr.review.s2, a2: lr.review.a2 }); sg.remove(); }
+      if (k === 'far') { const lf = lastRec(s.id, date, 'far'); const nx = suggestNext(lf.far, s.direction || S.settings.directionDefault); if (nx) $('[data-rp="far"]', eb)._rp.set(nx); sg.remove(); }
       if (k === 'review-h') { const lh = lastRec(s.id, date, 'hifz'); $('[data-rp="review"]', eb)._rp.set({ s1: lh.hifz.s1, a1: lh.hifz.a1, s2: lh.hifz.s2, a2: lh.hifz.a2 }); sg.remove(); }
       if (k === 'noor') { const ln = lastRec(s.id, date, 'noor'); const L = NOORANIA[ln.noor.lesson - 1]; let les = ln.noor.lesson, fr = (Math.max(ln.noor.from || 0, ln.noor.to || 0)) + 1; if (fr > L.items.length) { les = Math.min(NOORANIA.length, les + 1); fr = 1; } const len = Math.max(5, Math.abs((ln.noor.to || 0) - (ln.noor.from || 0)) + 1); r.noor = { lesson: les, from: fr, to: Math.min(NOORANIA[les - 1].items.length, fr + len - 1), grade: 0 }; drawBody(); }
       return;
@@ -200,15 +211,24 @@ function recordEditor(s, date) {
       });
       return;
     }
+    const ms = t.closest('[data-msur]'); if (ms) { const [k, n] = ms.dataset.msur.split('|'); const sn = +n; $(`[data-rp="${k}"]`, eb)._rp.set({ s1: sn, a1: 1, s2: sn, a2: Q.count(sn) }); return; }
+    const cs = t.closest('[data-csug]'); if (cs) { r.cur[cs.dataset.csug] = curSuggest(s.id, date, cs.dataset.csug); drawBody(); return; }
+    const ca = t.closest('[data-call]'); if (ca) { const cid = ca.dataset.call; const x = r.cur[cid]; x.items = curById(cid).lessons[x.lesson - 1].items.map((_, i) => i); x.errs = []; drawBody(); return; }
+    const ci = t.closest('[data-citem]'); if (ci) { const [cid, i] = ci.dataset.citem.split('|'); const idx = +i; const x = r.cur[cid]; x.items = x.items || []; x.errs = x.errs || []; const errMode = $(`[data-cerr="${cid}"]`, eb) && $(`[data-cerr="${cid}"]`, eb).checked; const now = Date.now(); const dbl = ci._t && now - ci._t < 400;
+      if (errMode || dbl) { x.items = x.items.filter(v => v !== idx); x.errs = x.errs.includes(idx) && !dbl ? x.errs.filter(v => v !== idx) : x.errs.filter(v => v !== idx).concat([idx]); }
+      else if (x.errs.includes(idx)) x.errs = x.errs.filter(v => v !== idx);
+      else x.items = x.items.includes(idx) ? x.items.filter(v => v !== idx) : x.items.concat([idx]);
+      const keepErr = errMode; drawBody(); const nb = $(`[data-citem="${cid}|${idx}"]`, eb); if (nb) nb._t = dbl ? 0 : now; if (keepErr) $(`[data-cerr="${cid}"]`, eb).checked = true; return; }
     const zd = t.closest('[data-zdel]'); if (zd) { const [cat, ...it] = zd.dataset.zdel.split('|'); r.zad = r.zad.filter(z => !(z.cat === cat && z.item === it.join('|'))); drawBody(); return; }
     const bh = t.closest('[data-b]'); if (bh) { r.behavior = r.behavior == +bh.dataset.b ? 0 : +bh.dataset.b; $$('#beh button', eb).forEach(b => b.style.color = (r.behavior || 0) >= +b.dataset.b ? '#e2b93b' : '#ddd'); return; }
     const qn = t.closest('[data-qn]'); if (qn) { r.note = (r.note ? r.note + ' — ' : '') + qn.dataset.qn; $('#enote', eb).value = r.note; return; }
     if (t.id === 'eadd') addErrorManual();
   });
   const doSave = () => {
-    ['hifz', 'review'].forEach(k => { if (r[k] && r[k].s1) { r[k].s2 = r[k].s2 || r[k].s1; r[k].pages = +Q.pagesBetween(r[k].s1, r[k].a1, r[k].s2, r[k].a2).toFixed(3); } else delete r[k]; });
+    ['hifz', 'review', 'far'].forEach(k => { if (r[k] && r[k].s1) { r[k].s2 = r[k].s2 || r[k].s1; r[k].pages = +Q.pagesBetween(r[k].s1, r[k].a1, r[k].s2, r[k].a2).toFixed(3); } else delete r[k]; });
     if (r.noor && !r.noor.lesson) delete r.noor; if (r.noor) delete r.noor._picked;
-    if (r.att === 'a' || r.att === 'e') { delete r.hifz; delete r.review; delete r.noor; r.zad = []; }
+    if (r.att === 'a' || r.att === 'e') { delete r.hifz; delete r.review; delete r.far; delete r.noor; r.zad = []; r.cur = {}; }
+    Object.keys(r.cur || {}).forEach(k => { if (!r.cur[k] || !r.cur[k].lesson) delete r.cur[k]; });
     save('records', r); toast('✔️ تم الحفظ');
   };
   $('[data-save]', m.el).onclick = () => { doSave(); m.close(); render(); };

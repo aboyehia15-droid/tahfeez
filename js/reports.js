@@ -2,7 +2,7 @@
 const REPORTS = [
   ['student', '👦 تقرير طالب شامل'], ['week', '🗓️ جدول الأسبوع (كشف المتابعة)'], ['class', '🏫 التقرير الإجمالي للفصل والترتيب'],
   ['all', '🧭 لوحة المشرف (كل الفصول والمعلمين)'], ['att', '📅 تقرير الحضور والغياب'], ['noor', '🔤 تقرير النورانية'], ['zad', '🌸 تقرير زاد الطفل'],
-  ['errors', '✏️ تقرير الأخطاء والتصويب'], ['fees', '💰 تقرير الرسوم']
+  ['cur', '📚 تقرير المناهج (الحروف والأرقام…)'], ['errors', '✏️ تقرير الأخطاء والتصويب'], ['fees', '💰 تقرير الرسوم']
 ];
 let REP = { type: 'student', period: 'month', ref: '', from: '', to: '', cls: '', stu: '', blank: false, allStu: false, subs: { quran: 1, noor: 1, zad: 1, att: 1, notes: 1, fees: 1 } };
 
@@ -21,6 +21,7 @@ function viewReports(v, sub, arg) {
       <div class="grid g3">
         <div class="field"><label>نوع التقرير</label><select class="inp" id="rt">${types.map(([k, t]) => `<option value="${k}" ${REP.type === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         ${needCls ? `<div class="field"><label>الفصل</label><select class="inp" id="rc">${REP.type === 'fees' ? '<option value="">كل الفصول</option>' : ''}${classes.map(c => `<option value="${c.id}" ${REP.cls === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>` : ''}
+        ${REP.type === 'cur' ? `<div class="field"><label>المنهج</label><select class="inp" id="rcur">${curricula().map(c => `<option value="${c.id}" ${REP.cur === c.id ? 'selected' : ''}>${c.icon} ${esc(c.name)}</option>`).join('')}</select></div>` : ''}
         ${REP.type === 'student' ? `<div class="field"><label>الطالب</label><select class="inp" id="rs" ${REP.allStu ? 'disabled' : ''}>${studs.map(s => `<option value="${s.id}" ${REP.stu === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
       </div>
       ${REP.type !== 'fees' ? `<div class="row" style="margin-top:4px"><div class="tabs" style="margin:0">${(REP.type === 'week' ? [['week', 'أسبوع']] : [['day', 'يومي'], ['week', 'أسبوعي'], ['month', 'شهري'], ['custom', 'من تاريخ إلى تاريخ'], ['all', 'منذ البداية']]).map(([k, t]) => `<button data-p="${k}" class="${REP.period === k ? 'on' : ''}">${t}</button>`).join('')}</div>
@@ -32,6 +33,7 @@ function viewReports(v, sub, arg) {
   const re = () => render();
   $('#rt').onchange = e => { REP.type = e.target.value; if (REP.type !== 'week' && REP.period === 'week' && REP.type !== 'student') REP.period = 'month'; re(); };
   const rc = $('#rc'); if (rc) rc.onchange = e => { REP.cls = e.target.value; REP.stu = ''; re(); };
+  const rcu = $('#rcur'); if (rcu) rcu.onchange = e => { REP.cur = e.target.value; re(); };
   const rs = $('#rs'); if (rs) rs.onchange = e => { REP.stu = e.target.value; re(); };
   $$('[data-p]', v).forEach(b => b.onclick = () => { REP.period = b.dataset.p; re(); });
   const rr = $('#rref'); if (rr) rr.onchange = e => { REP.ref = e.target.value || todayISO(); re(); };
@@ -50,6 +52,7 @@ function viewReports(v, sub, arg) {
     att: () => `<div class="report">${attReport(REP.cls, from, to, periodLbl)}</div>`,
     noor: () => `<div class="report">${noorReport(REP.cls, from, to, periodLbl)}</div>`,
     zad: () => `<div class="report">${zadReport(REP.cls, from, to, periodLbl)}</div>`,
+    cur: () => `<div class="report">${curReport(REP.cls, REP.cur || (curricula()[0] || {}).id, from, to, periodLbl)}</div>`,
     errors: () => `<div class="report">${errorsReport(REP.cls, from, to, periodLbl)}</div>`,
     fees: () => `<div class="report">${feesReport(REP.cls)}</div>`
   };
@@ -72,11 +75,11 @@ function studentReport(s, from, to, periodLbl, subs) {
   const rs = o.recs;
   let h = repHeader('تقرير متابعة الطالب', periodLbl);
   h += `<div class="rep-meta"><span>الطالب: <b>${esc(s.name)}</b></span><span>الفصل: <b>${esc(c ? c.name : '—')}</b></span><span>المعلم: <b>${esc(t ? t.name : '—')}</b></span>${s.birthDate ? `<span>العمر: <b>${ageFrom(s.birthDate)}</b></span>` : ''}${S.settings.supervisor ? `<span>المشرف: <b>${esc(S.settings.supervisor)}</b></span>` : ''}</div>`;
-  h += kpis([[num(o.hifz), '📖 أوجه الحفظ'], [num(o.review), '🔁 أوجه المراجعة'], [num(o.total), '✳️ الإجمالي'], [rank ? rank + ' / ' + studentsOfClass(s.classId).length : '—', '🏆 الترتيب في الفصل'], [(o.p + o.l) + ' / ' + o.days, '📅 الحضور'], [levelOf(o), '🎖️ المستوى']]);
+  h += kpis([[num(o.hifz), '📖 أوجه الحفظ'], [num(o.reviewAll), '🔁 أوجه المراجعة (قريبة وبعيدة)'], [num(o.total), '✳️ الإجمالي'], [rank ? rank + ' / ' + studentsOfClass(s.classId).length : '—', '🏆 الترتيب في الفصل'], [(o.p + o.l) + ' / ' + o.days, '📅 الحضور'], [levelOf(o), '🎖️ المستوى']]);
   if (subs.quran && f.quran) {
-    const qr = rs.filter(r => (r.hifz && r.hifz.s1) || (r.review && r.review.s1) || r.att === 'a');
+    const qr = rs.filter(r => (r.hifz && r.hifz.s1) || (r.review && r.review.s1) || (r.far && r.far.s1) || r.att === 'a');
     h += `<div class="rep-sec">📖 القرآن الكريم — الحفظ والمراجعة</div>`;
-    h += qr.length ? `<table class="tbl"><tr><th>اليوم</th><th>التاريخ</th><th>الحضور</th><th>الحفظ (السورة والآيات)</th><th>أوجه</th><th>التقدير</th><th>المراجعة (السورة والآيات)</th><th>أوجه</th><th>التقدير</th></tr>${qr.map(r => `<tr><td>${dayName(r.date)}</td><td>${fmtDate(r.date, false)}</td>${r.att === 'a' ? '<td colspan="7" style="color:var(--red);font-weight:700">غائب</td>' : `<td>${ATT[r.att] ? ATT[r.att][0] : ''}</td><td class="r">${r.hifz ? Q.rangeText(r.hifz) : '—'}</td><td>${r.hifz ? num(r.hifz.pages) : ''}</td><td>${r.hifz ? gradeLabel(r.hifz.grade) : ''}</td><td class="r">${r.review ? Q.rangeText(r.review) : '—'}</td><td>${r.review ? num(r.review.pages) : ''}</td><td>${r.review ? gradeLabel(r.review.grade) : ''}</td>`}</tr>`).join('')}<tr style="font-weight:800"><td colspan="4">الإجمالي</td><td>${num(o.hifz)}</td><td></td><td></td><td>${num(o.review)}</td><td></td></tr></table>` : '<div class="muted small">لا توجد تسجيلات في هذه الفترة</div>';
+    h += qr.length ? `<table class="tbl"><tr><th>اليوم</th><th>التاريخ</th><th>الحضور</th><th>الحفظ (السورة والآيات)</th><th>أوجه</th><th>التقدير</th><th>المراجعة القريبة</th><th>أوجه</th><th>التقدير</th><th>المراجعة البعيدة</th><th>أوجه</th><th>التقدير</th></tr>${qr.map(r => `<tr><td>${dayName(r.date)}</td><td>${fmtDate(r.date, false)}</td>${r.att === 'a' ? '<td colspan="10" style="color:var(--red);font-weight:700">غائب</td>' : `<td>${ATT[r.att] ? ATT[r.att][0] : ''}</td>${['hifz', 'review', 'far'].map(k => `<td class="r">${r[k] ? Q.rangeText(r[k]) : '—'}</td><td>${r[k] ? num(r[k].pages) : ''}</td><td>${r[k] ? gradeLabel(r[k].grade) : ''}</td>`).join('')}`}</tr>`).join('')}<tr style="font-weight:800"><td colspan="4">الإجمالي</td><td>${num(o.hifz)}</td><td></td><td></td><td>${num(o.review)}</td><td></td><td></td><td>${num(o.far)}</td><td></td></tr></table>` : '<div class="muted small">لا توجد تسجيلات في هذه الفترة</div>';
     const memo = memorizedSet(allRecsOf(s.id)); const prog = surahProgress(memo); const done = prog.map((p, i) => [p, i]).filter(x => x[0] > 0);
     if (done.length) h += `<div class="small" style="margin-top:6px"><b>السور المحفوظة حتى الآن (${num(pagesOfSet(memo))} وجه):</b> ${done.map(([p, i]) => Q.names[i] + (p < 1 ? ' (' + Math.round(p * 100) + '%)' : ' ✓')).join('، ')}</div>`;
   }
@@ -84,6 +87,7 @@ function studentReport(s, from, to, periodLbl, subs) {
     const nr = rs.filter(r => r.noor && r.noor.lesson);
     h += `<div class="rep-sec">🔤 القاعدة النورانية</div>` + (nr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>الدرس</th><th>من بند</th><th>إلى بند</th><th>التقدير</th><th>أخطاء</th></tr>${nr.map(r => `<tr><td>${fmtDate(r.date)}</td><td class="r">${esc(NOORANIA[r.noor.lesson - 1].title)}</td><td>${r.noor.from || ''}${r.noor.from ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.from - 1] || '') + '»' : ''}</td><td>${r.noor.to || ''}${r.noor.to ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.to - 1] || '') + '»' : ''}</td><td>${gradeLabel(r.noor.grade)}</td><td>${(r.errors || []).filter(e => e.sub === 'noor').map(e => esc(e.word || '')).join('، ')}</td></tr>`).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
   }
+  if (subs.cur !== 0) classSubjects(c).filter(isCur).forEach(cid => { h += curStudentSection(s, cid, rs); });
   if (subs.zad && f.zad) {
     const zr = []; rs.forEach(r => (r.zad || []).forEach(z => zr.push(Object.assign({ date: r.date }, z))));
     h += `<div class="rep-sec">🌸 زاد الطفل المسلم</div>` + (zr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المجال</th><th>البند</th><th>التقدير</th></tr>${zr.map(z => { const cat = zadCurriculum().find(c => c.id === z.cat) || {}; return `<tr><td>${fmtDate(z.date)}</td><td>${cat.icon || ''} ${esc(cat.name || '')}</td><td class="r">${esc(z.item)}</td><td>${gradeLabel(z.grade)}</td></tr>`; }).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
@@ -98,7 +102,7 @@ function studentReport(s, from, to, periodLbl, subs) {
   return h;
 }
 function errText(e) {
-  const where = e.sub === 'noor' ? 'نورانية د' + e.lesson + (e.word ? ' «' + esc(e.word) + '»' : '') : e.sub === 'zad' ? 'زاد الطفل' : (e.sub === 'review' ? 'مراجعة: ' : 'حفظ: ') + (Q.names[e.s - 1] || '') + ' ' + (e.a || '') + (e.word ? ' «' + esc(e.word) + '»' : '');
+  const where = e.sub === 'noor' ? 'نورانية د' + e.lesson + (e.word ? ' «' + esc(e.word) + '»' : '') : e.sub === 'zad' ? 'زاد الطفل' : (e.sub === 'review' ? 'مراجعة: ' : e.sub === 'far' ? 'مراجعة بعيدة: ' : 'حفظ: ') + (Q.names[e.s - 1] || '') + ' ' + (e.a || '') + (e.word ? ' «' + esc(e.word) + '»' : '');
   return `${e.fixed ? '✅' : '❌'} ${where} — ${esc(e.type || '')}${e.note ? ': ' + esc(e.note) : ''}`;
 }
 function weekReport(cid, ws, blank) {
@@ -113,30 +117,32 @@ function weekReport(cid, ws, blank) {
     const L = [];
     if (r.hifz && r.hifz.s1) L.push(`<b>ح:</b> ${Q.rangeText(r.hifz)} <small>(${gradeLabel(r.hifz.grade)})</small>`);
     if (r.review && r.review.s1) L.push(`<b>م:</b> ${Q.rangeText(r.review)} <small>(${gradeLabel(r.review.grade)})</small>`);
+    if (r.far && r.far.s1) L.push(`<b>ب:</b> ${Q.rangeText(r.far)} <small>(${gradeLabel(r.far.grade)})</small>`);
+    Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (c && x && x.lesson) L.push(`${c.icon} ${esc(curShort(c.lessons[x.lesson - 1].t))} <small>(${gradeLabel(x.grade)})</small>`); });
     if (r.noor && r.noor.lesson) L.push(`<b>ن:</b> د${r.noor.lesson} ${r.noor.from ? r.noor.from + '–' + r.noor.to : ''} <small>(${gradeLabel(r.noor.grade)})</small>`);
     if (r.zad && r.zad.length) L.push(`<b>ز:</b> ${r.zad.map(z => esc(z.item)).join('، ')}`);
     if (r.att === 'l') L.push('<small>متأخر</small>');
     return L.join('<br>');
   };
   let h = repHeader('كشف متابعة الحلقة — جدول الأسبوع', 'الأسبوع من ' + fmtDate(days[0] || ws) + ' إلى ' + fmtDate(days[days.length - 1] || ws) + ' — ' + hijri(days[0] || ws));
-  h += `<div class="rep-meta"><span>الفصل: <b>${esc(c.name)}</b></span><span>المعلم: <b>${esc(t ? t.name : '')}</b></span>${S.settings.supervisor ? `<span>المشرف: <b>${esc(S.settings.supervisor)}</b></span>` : ''}<span>عدد الطلاب: <b>${studs.length}</b></span><span class="small muted">ح: حفظ — م: مراجعة${subj.includes('noor') ? ' — ن: نورانية' : ''}${subj.includes('zad') ? ' — ز: زاد الطفل' : ''}</span></div>`;
+  h += `<div class="rep-meta"><span>الفصل: <b>${esc(c.name)}</b></span><span>المعلم: <b>${esc(t ? t.name : '')}</b></span>${S.settings.supervisor ? `<span>المشرف: <b>${esc(S.settings.supervisor)}</b></span>` : ''}<span>عدد الطلاب: <b>${studs.length}</b></span><span class="small muted">ح: حفظ — م: مراجعة قريبة — ب: مراجعة بعيدة${subj.includes('noor') ? ' — ن: نورانية' : ''}${subj.includes('zad') ? ' — ز: زاد الطفل' : ''}</span></div>`;
   h += `<div class="tbl-wrap"><table class="tbl week-tbl"><tr><th>م</th><th>اسم الطالب</th>${days.map(d => `<th>${dayName(d)}<br><small>${fmtDate(d, false)}</small></th>`).join('')}${blank ? '' : '<th>أوجه الحفظ</th><th>أوجه المراجعة</th><th>الغياب</th>'}</tr>`;
-  studs.forEach((s, i) => { const o = statsOf(s.id, days[0], days[days.length - 1]); h += `<tr><td>${i + 1}</td><td class="r" style="white-space:nowrap"><b>${esc(s.name)}</b></td>${days.map(d => { const r = getRec(s.id, d); return `<td class="r ${r && r.att === 'a' && !blank ? 'abs' : ''}">${cell(r)}</td>`; }).join('')}${blank ? '' : `<td><b>${num(o.hifz)}</b></td><td><b>${num(o.review)}</b></td><td>${o.a || ''}</td>`}</tr>`; });
+  studs.forEach((s, i) => { const o = statsOf(s.id, days[0], days[days.length - 1]); h += `<tr><td>${i + 1}</td><td class="r" style="white-space:nowrap"><b>${esc(s.name)}</b></td>${days.map(d => { const r = getRec(s.id, d); return `<td class="r ${r && r.att === 'a' && !blank ? 'abs' : ''}">${cell(r)}</td>`; }).join('')}${blank ? '' : `<td><b>${num(o.hifz)}</b></td><td><b>${num(o.reviewAll)}</b></td><td>${o.a || ''}</td>`}</tr>`; });
   h += `</table></div><div class="rep-foot"><span>توقيع المعلم: ..................</span><span>توقيع المشرف: ..................</span></div>`;
   return h;
 }
 function classReport(cid, from, to, lbl) {
   const c = byId('classes', cid); if (!c) return ''; const t = teacherOf(c);
   const rk = rankClass(cid, from, to);
-  const tot = rk.reduce((a, x) => (a.h += x.o.hifz, a.r += x.o.review, a.a += x.o.a, a), { h: 0, r: 0, a: 0 });
+  const tot = rk.reduce((a, x) => (a.h += x.o.hifz, a.r += x.o.reviewAll, a.a += x.o.a, a), { h: 0, r: 0, a: 0 });
   let h = repHeader('التقرير الإجمالي للفصل مع الترتيب', lbl);
   h += `<div class="rep-meta"><span>الفصل: <b>${esc(c.name)}</b></span><span>المعلم: <b>${esc(t ? t.name : '')}</b></span><span>عدد الطلاب: <b>${rk.length}</b></span></div>`;
   h += kpis([[num(tot.h), 'إجمالي أوجه الحفظ'], [num(tot.r), 'إجمالي أوجه المراجعة'], [num(tot.h + tot.r), 'الإجمالي العام'], [tot.a, 'إجمالي الغياب'], [rk.length ? num((tot.h + tot.r) / rk.length) : 0, 'متوسط الأوجه للطالب']]);
-  h += `<table class="tbl"><tr><th>الترتيب</th><th>اسم الطالب</th><th>أوجه الحفظ</th><th>أوجه المراجعة</th><th>الإجمالي</th><th>الحضور</th><th>الغياب</th><th>متوسط التقدير</th><th>النقاط</th><th>المستوى</th></tr>${rk.map(x => `<tr><td>${x.rank <= 3 ? ['🥇', '🥈', '🥉'][x.rank - 1] : x.rank}</td><td class="r"><b>${esc(x.s.name)}</b></td><td>${num(x.o.hifz)}</td><td>${num(x.o.review)}</td><td><b>${num(x.o.total)}</b></td><td>${x.o.p + x.o.l}</td><td>${x.o.a}</td><td>${x.o.gcnt ? gradeLabel(Math.round(x.o.gavg)) : ''}</td><td>${x.o.points}</td><td>${levelOf(x.o)}</td></tr>`).join('')}</table>`;
+  h += `<table class="tbl"><tr><th>الترتيب</th><th>اسم الطالب</th><th>أوجه الحفظ</th><th>أوجه المراجعة</th><th>الإجمالي</th><th>الحضور</th><th>الغياب</th><th>متوسط التقدير</th><th>النقاط</th><th>المستوى</th></tr>${rk.map(x => `<tr><td>${x.rank <= 3 ? ['🥇', '🥈', '🥉'][x.rank - 1] : x.rank}</td><td class="r"><b>${esc(x.s.name)}</b></td><td>${num(x.o.hifz)}</td><td>${num(x.o.reviewAll)}</td><td><b>${num(x.o.total)}</b></td><td>${x.o.p + x.o.l}</td><td>${x.o.a}</td><td>${x.o.gcnt ? gradeLabel(Math.round(x.o.gavg)) : ''}</td><td>${x.o.points}</td><td>${levelOf(x.o)}</td></tr>`).join('')}</table>`;
   return h + `<div class="rep-foot"><span>المعلم: ${esc(t ? t.name : '')}</span><span>المشرف: ${esc(S.settings.supervisor || '')}</span></div>`;
 }
 function allReport(from, to, lbl) {
-  const rows = T('classes').map(c => { const st = studentsOfClass(c.id); const os = st.map(s => statsOf(s.id, from, to)); const sum = k => os.reduce((a, o) => a + o[k], 0); return { c, t: teacherOf(c), n: st.length, h: sum('hifz'), r: sum('review'), a: sum('a'), d: sum('days'), top: rankClass(c.id, from, to)[0] }; });
+  const rows = T('classes').map(c => { const st = studentsOfClass(c.id); const os = st.map(s => statsOf(s.id, from, to)); const sum = k => os.reduce((a, o) => a + o[k], 0); return { c, t: teacherOf(c), n: st.length, h: sum('hifz'), r: sum('reviewAll'), a: sum('a'), d: sum('days'), top: rankClass(c.id, from, to)[0] }; });
   const T2 = rows.reduce((a, x) => (a.n += x.n, a.h += x.h, a.r += x.r, a.a += x.a, a), { n: 0, h: 0, r: 0, a: 0 });
   let h = repHeader('لوحة المشرف — التقرير الإجمالي', lbl);
   h += kpis([[rows.length, 'عدد الفصول'], [new Set(rows.map(x => x.t && x.t.id).filter(Boolean)).size, 'عدد المعلمين'], [T2.n, 'عدد الطلاب'], [num(T2.h), 'إجمالي أوجه الحفظ'], [num(T2.r), 'إجمالي أوجه المراجعة'], [num(T2.h + T2.r), 'الإجمالي العام'], [T2.a, 'إجمالي الغياب']]);

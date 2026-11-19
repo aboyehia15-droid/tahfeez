@@ -79,7 +79,7 @@ function parseQuranSpeech(text) {
   const sur = Q.findAllSurahs(t);
   const nums = (t.match(/\d+/g) || []).map(Number);
   const r = {};
-  if (/مراجع/.test(t)) r.kind = 'review'; else if (/حفظ/.test(t)) r.kind = 'hifz';
+  if (/بعيد/.test(t)) r.kind = 'far'; else if (/مراجع/.test(t)) r.kind = 'review'; else if (/حفظ/.test(t)) r.kind = 'hifz';
   if (!sur.length) return null;
   r.s1 = sur[0].s;
   r.s2 = sur.length > 1 ? sur[sur.length - 1].s : r.s1;
@@ -128,38 +128,54 @@ function listen(btn, onText) {
 /* ——— مكوّن اختيار المقطع القرآني ——— */
 function surahOptions(sel) { return Q.names.map((n, i) => `<option value="${i + 1}" ${sel == i + 1 ? 'selected' : ''}>${i + 1}. ${n}</option>`).join(''); }
 function ayahOptions(s, sel) { let h = ''; const c = Q.count(s); for (let i = 1; i <= c; i++) h += `<option ${sel == i ? 'selected' : ''}>${i}</option>`; return h; }
+/* الأجزاء المعتمدة في البرنامج: الفاتحة + عم + تبارك + قد سمع — والسور مرتبة من آخر الجزء كما في كشوف المجمع */
+const JUZ_LIST = [
+  { id: 'fatiha', name: 'سورة الفاتحة', surahs: [1] },
+  { id: 'j30', name: 'جزء عمّ', surahs: Array.from({ length: 37 }, (_, i) => 114 - i) },
+  { id: 'j29', name: 'جزء تبارك', surahs: Array.from({ length: 11 }, (_, i) => 77 - i) },
+  { id: 'j28', name: 'جزء قد سمع', surahs: Array.from({ length: 9 }, (_, i) => 66 - i) }
+];
+const juzOf = s => (JUZ_LIST.find(j => j.surahs.includes(+s)) || {}).id || '';
 function rangePicker(r, onChange) {
   r = r || {};
   const el = document.createElement('div');
+  let juz = juzOf(r.s1) || '';
+  const opts = (list, sel) => list.map(n => `<option value="${n}" ${sel == n ? 'selected' : ''}>${Q.names[n - 1]}</option>`).join('');
   const draw = () => {
     const pages = Q.pagesBetween(r.s1, r.a1, r.s2, r.a2);
+    const J = JUZ_LIST.find(j => j.id === juz);
+    const allowed = JUZ_LIST.flatMap(j => j.surahs);
+    const list1 = J ? J.surahs : [];
+    const list2 = J ? (r.s2 && !J.surahs.includes(r.s2) ? J.surahs.concat([r.s2]) : J.surahs) : [];
     el.innerHTML = `
-      <div class="range-grid">
-        <div class="field"><label>من سورة</label><select class="inp" data-k="s1"><option value="">— اختر —</option>${surahOptions(r.s1)}</select></div>
+      <div class="row" style="margin-bottom:8px;gap:6px">${JUZ_LIST.map(j => `<button type="button" class="btn sm ${juz === j.id ? '' : 'ghost'}" data-juz="${j.id}">${j.name}</button>`).join('')}</div>
+      ${J ? `<div class="range-grid">
+        <div class="field"><label>من سورة</label><select class="inp" data-k="s1"><option value="">— اختر السورة —</option>${opts(list1, r.s1)}</select></div>
         <div class="field"><label>من آية</label><select class="inp" data-k="a1">${r.s1 ? ayahOptions(r.s1, r.a1) : ''}</select></div>
-        <div class="field"><label>إلى سورة</label><select class="inp" data-k="s2"><option value="">— اختر —</option>${surahOptions(r.s2)}</select></div>
+        <div class="field"><label>إلى سورة</label><select class="inp" data-k="s2"><option value="">— اختر السورة —</option>${opts(list2, r.s2)}</select></div>
         <div class="field"><label>إلى آية</label><select class="inp" data-k="a2">${r.s2 ? ayahOptions(r.s2, r.a2) : ''}</select></div>
-      </div>
-      <div class="row small">${r.s1 ? `<span class="pages-badge">${num(pages)} وجه</span><span class="muted">${Q.rangeText(r)}</span>` : '<span class="muted">اختر يدوياً أو اضغط 🎤 وقل مثلاً: «سورة النبأ من آية ١ إلى ١٦»</span>'}
-      ${r.s1 ? '<button type="button" class="btn sm ghost" data-whole>السورة كاملة</button>' : ''}</div>`;
+      </div>` : (r.s1 && !allowed.includes(r.s1) ? `<div class="small">${Q.rangeText(r)}</div>` : '')}
+      <div class="row small">${r.s1 ? `<span class="pages-badge">${num(pages)} وجه</span><span class="muted">${Q.rangeText(r)}</span><button type="button" class="btn sm ghost" data-whole>السورة كاملة</button><button type="button" class="btn sm ghost" data-clear>✕ مسح</button>` : `<span class="muted">${J ? 'اختر السورة والآيات' : 'اختر الجزء أولاً'}، أو اضغط 🎤 وقل مثلاً: «سورة النبأ من آية ١ إلى ١٦»</span>`}</div>`;
+    $$('[data-juz]', el).forEach(b => b.onclick = () => { juz = b.dataset.juz; const J2 = JUZ_LIST.find(j => j.id === juz); if (J2.surahs.length === 1) { r.s1 = r.s2 = J2.surahs[0]; r.a1 = 1; r.a2 = Q.count(r.s1); r.pages = Q.pagesBetween(r.s1, r.a1, r.s2, r.a2); onChange && onChange(r); } draw(); });
     $$('select', el).forEach(sl => sl.onchange = () => {
       const k = sl.dataset.k; r[k] = +sl.value || null;
-      if (k === 's1') { r.a1 = 1; if (!r.s2 || r.s2 === r.s1 || true) { r.s2 = r.s1; r.a2 = Q.count(r.s1); } }
+      if (k === 's1') { r.a1 = 1; r.s2 = r.s1; r.a2 = Q.count(r.s1); }
       if (k === 's2') { if (r.s2 < r.s1) { r.a2 = 1; if (r.a1 == 1) r.a1 = Q.count(r.s1); } else r.a2 = Q.count(r.s2); }
       r.pages = Q.pagesBetween(r.s1, r.a1, r.s2, r.a2); draw(); onChange && onChange(r);
     });
     const wb = $('[data-whole]', el); if (wb) wb.onclick = () => { r.s2 = r.s1; r.a1 = 1; r.a2 = Q.count(r.s1); r.pages = Q.pagesBetween(r.s1, r.a1, r.s2, r.a2); draw(); onChange && onChange(r); };
+    const cl = $('[data-clear]', el); if (cl) cl.onclick = () => { ['s1', 'a1', 's2', 'a2', 'pages'].forEach(k => delete r[k]); draw(); onChange && onChange(r); };
   };
-  el.set = v => { Object.assign(r, v); r.pages = Q.pagesBetween(r.s1, r.a1, r.s2, r.a2); draw(); onChange && onChange(r); };
+  el.set = v => { Object.assign(r, v); r.pages = Q.pagesBetween(r.s1, r.a1, r.s2, r.a2); juz = juzOf(r.s1) || juz; draw(); onChange && onChange(r); };
   draw();
   return el;
 }
 
-/* ——— نص الآيات (جزء عم) مع تحديد الأخطاء بالنقر على الكلمة ——— */
-function ayahTextAvailable(s) { const t = window.JUZAMMA[Q.names[s - 1]]; return t && t.length === Q.count(s) ? t : null; }
+/* ——— نص الآيات (الفاتحة وأجزاء عم وتبارك وقد سمع) مع تحديد الأخطاء بالنقر على الكلمة ——— */
+function ayahTextAvailable(s) { const t = (window.QTEXT && window.QTEXT[s]) || (window.JUZAMMA || {})[Q.names[s - 1]]; return t && t.length === Q.count(s) ? t : null; }
 function ayahBoxHTML(range, errors) {
   if (!range || !range.s1) return '';
-  const set = Q.ayahSet(range); if (!set.length || set.length > 60) return '';
+  const set = Q.ayahSet(range); if (!set.length || set.length > 80) return '';
   let html = ''; let any = false; let lastS = 0;
   set.forEach(k => {
     const [s, a] = Q.absToSA(k); const txt = ayahTextAvailable(s); if (!txt) return; any = true;

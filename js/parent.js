@@ -52,7 +52,7 @@ function drawParent(root, s) {
       <div class="card no-print" style="padding:8px"><div class="tabs" style="margin:0;justify-content:center">${[['day', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر'], ['all', 'الكل'], ['custom', 'من–إلى']].map(([k, tt]) => `<button data-k="${k}" class="${PV.k === k ? 'on' : ''}">${tt}</button>`).join('')}</div>
         ${PV.k === 'custom' ? `<div class="row" style="justify-content:center;margin-top:8px"><input type="date" class="inp" id="pf" value="${from}" style="width:auto"> إلى <input type="date" class="inp" id="pt" value="${to}" style="width:auto"></div>` : ''}</div>
       <div class="grid g3">
-        ${f.quran && subj.includes('quran') ? `<div class="stat"><span class="i">📖</span><div class="n">${num(o.hifz)}</div><div class="l">وجه حفظ ${lbl}</div></div><div class="stat"><span class="i">🔁</span><div class="n">${num(o.review)}</div><div class="l">وجه مراجعة ${lbl}</div></div>` : ''}
+        ${f.quran && subj.includes('quran') ? `<div class="stat"><span class="i">📖</span><div class="n">${num(o.hifz)}</div><div class="l">وجه حفظ ${lbl}</div></div><div class="stat"><span class="i">🔁</span><div class="n">${num(o.reviewAll)}</div><div class="l">وجه مراجعة ${lbl}${o.far ? ` <small>(بعيدة ${num(o.far)})</small>` : ''}</div></div>` : ''}
         <div class="stat"><span class="i">📅</span><div class="n">${o.days ? o.attPct + '%' : '—'}</div><div class="l">الحضور (${o.p + o.l}/${o.days})${o.a ? ` · <b style="color:var(--red)">غياب ${o.a}</b>` : ''}</div></div>
         ${rk ? `<div class="stat"><span class="i">🏆</span><div class="n">${rk.rank}<small style="font-size:14px;color:var(--muted)"> / ${studentsOfClass(c.id).length}</small></div><div class="l">الترتيب في الفصل</div></div>` : ''}
         <div class="stat"><span class="i">🎖️</span><div class="n" style="font-size:20px">${levelOf(o)}</div><div class="l">المستوى العام</div></div>
@@ -64,6 +64,7 @@ function drawParent(root, s) {
         <div class="small muted" style="margin-bottom:6px">جزء عمّ:</div>
         <div class="surah-map">${Array.from({ length: 37 }, (_, i) => 114 - i).map(n => { const p = prog[n - 1]; return `<div class="${p >= 1 ? 'done' : p > 0 ? 'part' : ''}">${Q.names[n - 1]}${p > 0 && p < 1 ? `<i style="width:${p * 100}%"></i>` : ''}</div>`; }).join('')}</div>
         ${prog.slice(0, 77).some(p => p > 0) ? `<div class="small" style="margin-top:8px"><b>سور أخرى:</b> ${prog.slice(0, 77).map((p, i) => p > 0 ? Q.names[i] + (p < 1 ? ' (' + Math.round(p * 100) + '%)' : ' ✓') : '').filter(Boolean).join('، ')}</div>` : ''}</div>` : ''}
+      ${subj.filter(isCur).map(cid => curParentCard(s, cid)).join('')}
       ${f.noor && subj.includes('noor') ? `<div class="card"><h3>🔤 القاعدة النورانية</h3>${lastNoor ? `<div style="margin-bottom:8px">وصل إلى: <b>${esc(NOORANIA[lastNoor.noor.lesson - 1].title)}</b>${lastNoor.noor.to ? ` — البند «<span style="font-family:var(--quran);font-size:20px">${esc(NOORANIA[lastNoor.noor.lesson - 1].items[Math.max(lastNoor.noor.from, lastNoor.noor.to) - 1] || '')}</span>»` : ''}</div>` : '<div class="muted small">لم يبدأ بعد</div>'}
         <div class="noor-path">${NOORANIA.map((l, i) => `<span class="${lastNoor ? (i + 1 < lastNoor.noor.lesson ? 'done' : i + 1 === lastNoor.noor.lesson ? 'cur' : '') : ''}" title="${esc(l.title)}">${i + 1}</span>`).join('')}</div></div>` : ''}
       ${f.zad && subj.includes('zad') ? `<div class="card"><h3>🌸 زاد الطفل المسلم</h3><div class="badges">${zadCurriculum().map(z => { const got = [...new Set(zadAll.filter(x => x.cat === z.id).map(x => x.item))]; return `<div class="badge-it" style="border-color:${got.length ? z.color : ''}"><span class="e">${z.icon}</span><b>${esc(z.name)}</b><div>${got.length} / ${z.items.length}</div></div>`; }).join('')}</div>
@@ -86,12 +87,14 @@ function parentDay(r, subj) {
   if (r.att === 'l') L.push('<span class="chip gold">متأخر</span>');
   if (r.hifz && r.hifz.s1) L.push(`📖 <b>الحفظ:</b> ${Q.rangeText(r.hifz)} <span class="muted">(${num(r.hifz.pages)} وجه)</span> ${gradeChip(r.hifz.grade)}`);
   if (r.review && r.review.s1) L.push(`🔁 <b>المراجعة:</b> ${Q.rangeText(r.review)} <span class="muted">(${num(r.review.pages)} وجه)</span> ${gradeChip(r.review.grade)}`);
+  if (r.far && r.far.s1) L.push(`🕰️ <b>المراجعة البعيدة:</b> ${Q.rangeText(r.far)} <span class="muted">(${num(r.far.pages)} وجه)</span> ${gradeChip(r.far.grade)}`);
+  Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (!c || !x || !x.lesson) return; const Ls = c.lessons[x.lesson - 1] || { items: [] }; L.push(`${c.icon} <b>${esc(c.name)}:</b> ${esc(Ls.t || '')} ${gradeChip(x.grade)}${(x.items || []).length ? `<div class="small" style="color:#2c7a28">✔️ ${x.items.map(i => esc(Ls.items[i])).join('، ')}</div>` : ''}${(x.errs || []).length ? `<div class="small" style="color:var(--red)">📌 يحتاج تدريباً: ${x.errs.map(i => esc(Ls.items[i])).join('، ')}</div>` : ''}`); });
   if (r.noor && r.noor.lesson) { const N = NOORANIA[r.noor.lesson - 1]; L.push(`🔤 <b>النورانية:</b> ${esc(N.title)}${r.noor.from ? ` <span class="muted">(من «${esc(N.items[r.noor.from - 1] || '')}» إلى «${esc(N.items[r.noor.to - 1] || '')}»)</span>` : ''} ${gradeChip(r.noor.grade)}`); }
   (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat) || {}; L.push(`${c.icon || '🌸'} <b>${esc(c.name || '')}:</b> ${esc(z.item)} ${gradeChip(z.grade)}`); });
   if (r.behavior) L.push('السلوك: ' + stars(r.behavior));
   if (r.errors && r.errors.length) {
     L.push(`<div style="margin-top:4px"><b>✏️ الأخطاء والتصويب:</b>${r.errors.map(e => `<div class="small" style="padding:3px 0">${errText(e)}</div>`).join('')}</div>`);
-    ['hifz', 'review'].forEach(k => { const errs = r.errors.filter(e => e.sub === k && e.word); if (errs.length && r[k]) { const box = ayahBoxHTML(r[k], errs); if (box) L.push(box.replace('class="ayah-box"', 'class="ayah-box" style="font-size:20px;max-height:200px"')); } });
+    ['hifz', 'review', 'far'].forEach(k => { const errs = r.errors.filter(e => e.sub === k && e.word); if (errs.length && r[k]) { const box = ayahBoxHTML(r[k], errs); if (box) L.push(box.replace('class="ayah-box"', 'class="ayah-box" style="font-size:20px;max-height:200px"')); } });
   }
   if (r.note) L.push(`<div style="background:#fffbea;border-radius:10px;padding:6px 10px;margin-top:4px">📝 <b>ملاحظة المعلم:</b> ${esc(r.note)}</div>`);
   return L.map(x => `<div class="ln">${x}</div>`).join('') || '<div class="ln"><span class="chip green">حاضر</span></div>';
