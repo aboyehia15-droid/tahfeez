@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = {
   logoRight: 'assets/logo-taallam.png',
   logoLeft: 'assets/logo-ibntaymiyah.jpg',
   workDays: [0, 1, 2, 3, 4], // الأحد..الخميس
-  gradeLabels: { 5: 'ممتاز', 4: 'جيد جداً', 3: 'جيد', 2: 'مقبول', 1: 'يُعاد' },
+  gradeLabels: { 5: 'ممتاز', 4: 'جيد جداً', 3: 'جيد', 2: 'مقبول', 1: 'يحتاج متابعة' },
   features: { quran: true, noor: true, zad: true, fees: true, voice: true, leaders: true, behavior: true, parentPage: true },
   parentShowFees: true,
   feeDefault: 0,
@@ -220,7 +220,7 @@ function copyText(t) { (navigator.clipboard ? navigator.clipboard.writeText(t) :
 function loadScript(src) { return new Promise((res, rej) => { if ($(`script[src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
 const loadXLSX = () => loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
 const loadQR = () => loadScript('https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js');
-function gradeLabel(g) { return g ? (S.settings.gradeLabels[g] || '') : ''; }
+function gradeLabel(g) { if (!g) return ''; const l = (S.settings.gradeLabels || {})[g] || DEFAULT_SETTINGS.gradeLabels[g] || ''; return /^يُ?عاد$/.test(l.trim()) ? 'يحتاج متابعة' : l; }
 function gradeChip(g) { if (!g) return ''; const c = g >= 4 ? 'green' : g == 3 ? 'gold' : 'red'; return `<span class="chip ${c}">${gradeLabel(g)}</span>`; }
 const stars = n => n ? '<span class="stars">' + '★'.repeat(n) + '<span style="opacity:.25">' + '★'.repeat(5 - n) + '</span></span>' : '';
 function gradeButtons(cur, name) { return `<div class="grades" data-grade="${name}">${[5, 4, 3, 2, 1].map(g => `<button type="button" class="g${g} ${cur == g ? 'on' : ''}" data-g="${g}">${gradeLabel(g)}</button>`).join('')}</div>`; }

@@ -171,7 +171,7 @@ function zadReport(cid, from, to, lbl) {
   let h = repHeader('تقرير زاد الطفل المسلم', lbl) + `<div class="rep-meta"><span>الفصل: <b>${esc(c.name)}</b></span><span>المعلم: <b>${esc((teacherOf(c) || {}).name || '')}</b></span></div>`;
   h += `<table class="tbl"><tr><th>م</th><th>الطالب</th>${Z.map(z => `<th>${z.icon} ${esc(z.name)}</th>`).join('')}<th>المجموع</th></tr>${st.map((s, i) => { const items = recsOf(s.id, from, to).flatMap(r => r.zad || []); return `<tr><td>${i + 1}</td><td class="r"><b>${esc(s.name)}</b></td>${Z.map(z => { const it = items.filter(x => x.cat === z.id); const u = [...new Set(it.map(x => x.item))]; return `<td class="small" title="${esc(u.join('، '))}"><b>${u.length}</b>/${z.items.length}</td>`; }).join('')}<td><b>${new Set(items.map(x => x.cat + x.item)).size}</b></td></tr>`; }).join('')}</table>`;
   Z.forEach(z => { h += `<div class="rep-sec">${z.icon} ${esc(z.name)}</div><table class="tbl"><tr><th>البند</th>${st.map(s => `<th style="font-size:10px;writing-mode:vertical-rl;max-height:110px">${esc(s.name.split(' ').slice(0, 2).join(' '))}</th>`).join('')}</tr>${z.items.map(it => `<tr><td class="r">${esc(it)}</td>${st.map(s => { const got = recsOf(s.id, from, to).flatMap(r => r.zad || []).filter(x => x.cat === z.id && x.item === it); const g = Math.max(0, ...got.map(x => x.grade || 3)); return `<td>${got.length ? (g >= 4 ? '✅' : g >= 3 ? '☑️' : '🔄') : ''}</td>`; }).join('')}</tr>`).join('')}</table>`; });
-  return h + '<div class="small muted">✅ متقن — ☑️ جيد — 🔄 يحتاج إعادة</div>';
+  return h + '<div class="small muted">✅ متقن — ☑️ جيد — 🔄 يحتاج متابعة</div>';
 }
 function errorsReport(cid, from, to, lbl) {
   const c = byId('classes', cid); if (!c) return ''; const st = studentsOfClass(cid);
