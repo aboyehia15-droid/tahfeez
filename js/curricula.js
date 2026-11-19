@@ -87,11 +87,12 @@ function curriculaSettings(box) {
   const custom = S.settings.curricula || [];
   box.innerHTML = `<div class="card"><h3>📚 المناهج</h3><p class="small muted">كل منهج مقسم إلى دروس، ولكل درس بنود (مهارات) يسجل المعلم ما أتقنه الطالب منها يومياً. لتفعيل منهج في فصل: الفصول والمعلمون ← تعديل الفصل ← المواد.</p>
     ${curricula().map(c => { const b = !(S.settings.curricula || []).some(x => x.id === c.id); return `<div class="list-item"><span style="font-size:26px">${c.icon}</span><div style="flex:1"><b>${esc(c.name)}</b><div class="small muted">${c.lessons.length} درساً${c.book ? ' · 📘 ' + esc(c.book.replace('.pdf', '')) : ''}${b ? ' · منهج أساسي' : ' · منهج مضاف'} · مفعّل في ${T('classes').filter(x => (x.subjects || []).includes(c.id)).length} فصل</div></div><button class="btn sm light" data-cv="${c.id}">👁️ الدروس</button>${b ? '' : `<button class="btn sm light" data-ce="${c.id}">✏️</button>`}</div>`; }).join('')}
-    <div class="row" style="margin-top:12px"><button class="btn" id="cadd">➕ إضافة منهج جديد</button></div></div>`;
+    <div class="row" style="margin-top:12px"><button class="btn" id="cadd">➕ إضافة منهج جديد</button><button class="btn gold" id="callon">✅ تفعيل جميع المناهج في جميع الفصول</button></div></div>`;
   box.onclick = e => {
     const v = e.target.closest('[data-cv]'); if (v) { const c = curById(v.dataset.cv); modal({ title: c.icon + ' ' + esc(c.name), body: `<table class="tbl"><tr><th>م</th><th>الدرس</th><th>الصفحة</th><th>البنود</th></tr>${c.lessons.map((l, i) => `<tr><td>${i + 1}</td><td class="r"><b>${esc(l.t)}</b></td><td>${esc(l.p || '')}</td><td class="r small">${l.items.map(esc).join('، ')}</td></tr>`).join('')}</table>`, foot: false, wide: true }); }
     const ed = e.target.closest('[data-ce]'); if (ed) curForm(custom.find(x => x.id === ed.dataset.ce));
     if (e.target.id === 'cadd') curForm();
+    if (e.target.id === 'callon') { enableAllCurricula(); render(); }
   };
 }
 function curForm(c) {
@@ -114,4 +115,17 @@ function curForm(c) {
     saveSettings({ curricula: list }); m.close(); toast('✔️ حُفظ المنهج'); render();
   };
   const d = $('[data-del]', m.el); if (d) d.onclick = async () => { if (await confirmBox('حذف المنهج «' + c.name + '»؟ (تبقى تسجيلات الطلاب السابقة محفوظة)')) { saveSettings({ curricula: (S.settings.curricula || []).filter(x => x.id !== c.id) }); m.close(); render(); } };
+}
+
+/* تفعيل كل المناهج في كل الفصول (مرة واحدة تلقائياً عند فتح المدير للتطبيق، ومتاح بزر في الإعدادات) */
+function enableAllCurricula(silent) {
+  const ids = ['quran', 'noor', 'zad'].concat(curricula().map(c => c.id)); let n = 0;
+  S.data.classes.forEach(c => { const cur = c.subjects || ['quran', 'noor', 'zad']; const add = ids.filter(i => !cur.includes(i)); if (add.length) { c.subjects = cur.concat(add); save('classes', c); n++; } });
+  if (!silent) toast('✔️ فُعّلت جميع المناهج في ' + T('classes').length + ' فصل');
+  return n;
+}
+function autoEnableCurricula() {
+  if (!canAdmin() || viewingArchive() || S.settings.curAllOn) return;
+  if (!S.data.classes.length) return;
+  enableAllCurricula(true); saveSettings({ curAllOn: 1 }); render();
 }

@@ -66,7 +66,8 @@ function loadDemo() {
     if (!URLQ.get('p') && !URLQ.get('reg')) { localStorage.setItem(LS.server, sp); history.replaceState(null, '', location.pathname + location.hash); }
   }
   render();
-  if (!URLQ.get('p') && !URLQ.get('reg') && S.token) pull(true).then(ok => { if (ok) render(); });
+  if (!URLQ.get('p') && !URLQ.get('reg') && S.token) pull(true).then(ok => { if (ok) { render(); autoEnableCurricula(); } });
+  else if (!URLQ.get('p') && !URLQ.get('reg') && isLocal()) autoEnableCurricula();
   setInterval(() => { if (S.token && !document.hidden && !$('.modal-bg')) pull(true).then(ok => ok && !$('.modal-bg') && !location.hash.startsWith('#/tv') && render()); }, 120000);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

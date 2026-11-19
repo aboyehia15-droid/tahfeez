@@ -377,7 +377,7 @@ function viewClasses(v, sub) {
   }
 }
 function classForm(c) {
-  c = c || { subjects: ['quran', 'noor', 'zad'], track: 'mixed' };
+  c = c || { subjects: ['quran', 'noor', 'zad'].concat(curricula().map(x => x.id)), track: 'mixed' };
   const teachers = T('users').filter(u => u.role !== 'admin' || true);
   const m = modal({ title: c.id ? 'تعديل الفصل' : 'فصل جديد', body: `
     <div class="field"><label class="req">اسم الفصل / الحلقة</label><input class="inp" id="cn" value="${esc(c.name || '')}" placeholder="مثال: فصل الصديق — براعم ١"></div>
