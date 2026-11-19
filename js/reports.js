@@ -96,7 +96,7 @@ function studentReport(s, from, to, periodLbl, subs) {
     const nn = rs.filter(r => r.note || (r.errors && r.errors.length) || r.behavior);
     if (nn.length) h += `<div class="rep-sec">📝 ملاحظات المعلم والأخطاء والتصويب</div><table class="tbl"><tr><th>التاريخ</th><th>السلوك</th><th>الملاحظة</th><th>الأخطاء والتصويب</th></tr>${nn.map(r => `<tr><td>${fmtDate(r.date)}</td><td>${stars(r.behavior)}</td><td class="r">${esc(r.note || '')}</td><td class="r">${(r.errors || []).map(e => errText(e)).join('<br>')}</td></tr>`).join('')}</table>`;
   }
-  if (subs.fees && f.fees && canAdmin()) { const fe = feeOf(s), pa = paidOf(s); h += `<div class="rep-sec">💰 الرسوم</div><div class="small">المقررة: <b>${num(fe)}</b> — المسدد: <b style="color:var(--green)">${num(pa)}</b> — المتبقي: <b style="color:var(--red)">${num(Math.max(0, fe - pa))}</b> ${S.settings.currency}</div>`; }
+  if (subs.fees && f.fees && canAdmin()) { const dd = discountsOf(s), fe = feeOf(s), pa = paidOf(s); h += `<div class="rep-sec">💰 الرسوم</div><div class="small">${s.feeExempt ? '<b>🎓 معفى من الرسوم</b>' : `الأساسية: <b>${num(dd.base)}</b>${dd.total ? ` — الخصم: <b>${num(dd.total)}</b> (${[dd.sib ? 'أخوة' : '', dd.spec ? 'خاص' : ''].filter(Boolean).join('، ')}) — الصافي: <b>${num(fe)}</b>` : ''} — المسدد: <b style="color:var(--green)">${num(pa)}</b> — المتبقي: <b style="color:var(--red)">${num(Math.max(0, fe - pa))}</b> ${S.settings.currency}`}</div>`; }
   h += `<div class="rep-foot"><span>معلم الفصل: ${esc(t ? t.name : '')}</span><span>المشرف: ${esc(S.settings.supervisor || '')}</span><span>تاريخ الطباعة: ${fmtDate(todayISO(), false)}</span></div>`;
   return h;
 }
@@ -185,10 +185,11 @@ function errorsReport(cid, from, to, lbl) {
 }
 function feesReport(cid) {
   const st = activeStudents().filter(s => !cid || s.classId === cid).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-  const rows = st.map(s => ({ s, f: feeOf(s), p: paidOf(s) }));
-  const tf = rows.reduce((a, x) => a + x.f, 0), tp = rows.reduce((a, x) => a + x.p, 0);
+  const rows = st.map(s => ({ s, d: discountsOf(s), f: feeOf(s), p: paidOf(s) }));
+  const sum = k => rows.reduce((a, x) => a + (k === 'dsc' ? x.d.total : k === 'b' ? x.d.base : x[k]), 0);
+  const tf = sum('f'), tp = sum('p');
   let h = repHeader('تقرير الرسوم والسداد', cid ? esc(byId('classes', cid).name) : 'جميع الفصول');
-  h += kpis([[num(tf), 'إجمالي الرسوم'], [num(tp), 'المسدد'], [num(Math.max(0, tf - tp)), 'المتبقي'], [tf ? Math.round(tp / tf * 100) + '%' : '—', 'نسبة التحصيل']]);
-  h += `<table class="tbl"><tr><th>م</th><th>الطالب</th><th>الفصل</th><th>الرسوم</th><th>المسدد</th><th>المتبقي</th><th>الدفعات</th></tr>${rows.map((x, i) => `<tr><td>${i + 1}</td><td class="r">${esc(x.s.name)}</td><td>${esc((classOf(x.s) || {}).name || '')}</td><td>${num(x.f)}</td><td>${num(x.p)}</td><td style="font-weight:700;color:${x.f - x.p > 0 ? 'var(--red)' : ''}">${num(Math.max(0, x.f - x.p))}</td><td class="small">${T('payments').filter(p => p.studentId === x.s.id).map(p => num(p.amount) + ' (' + fmtDate(p.date, false) + ')' + (p.receiptUrl ? ' <a href="' + esc(p.receiptUrl) + '" target="_blank">📎</a>' : '')).join('، ')}</td></tr>`).join('')}</table>`;
+  h += kpis([[num(sum('b')), 'الرسوم الأساسية'], [num(sum('dsc')), 'الخصومات والإعفاءات'], [num(tf), 'صافي المستحق'], [num(tp), 'المسدد'], [num(Math.max(0, tf - tp)), 'المتبقي'], [tf ? Math.round(tp / tf * 100) + '%' : '—', 'نسبة التحصيل'], [rows.filter(x => x.s.feeExempt).length, '🎓 معفى'], [rows.filter(x => x.d.sib).length, '👨‍👦 خصم أخوة'], [rows.filter(x => x.d.spec).length, '⭐ خصم خاص']]);
+  h += `<table class="tbl"><tr><th>م</th><th>الطالب</th><th>الفصل</th><th>الرسوم</th><th>الخصم / الإعفاء</th><th>الصافي</th><th>المسدد</th><th>المتبقي</th><th>الدفعات</th></tr>${rows.map((x, i) => `<tr><td>${i + 1}</td><td class="r">${esc(x.s.name)}</td><td>${esc((classOf(x.s) || {}).name || '')}</td><td>${num(x.d.base)}</td><td class="small">${x.d.total ? '<b>' + num(x.d.total) + '</b> ' : ''}${x.s.feeExempt ? 'معفى' + (x.s.exemptNote ? ' (' + esc(x.s.exemptNote) + ')' : '') : [x.d.sib ? 'أخوة' : '', x.d.spec ? 'خاص' + (x.s.specDisc.note ? ' (' + esc(x.s.specDisc.note) + ')' : '') : ''].filter(Boolean).join('، ')}</td><td><b>${num(x.f)}</b></td><td>${num(x.p)}</td><td style="font-weight:700;color:${x.f - x.p > 0 ? 'var(--red)' : ''}">${num(Math.max(0, x.f - x.p))}</td><td class="small">${T('payments').filter(p => p.studentId === x.s.id).map(p => num(p.amount) + ' (' + fmtDate(p.date, false) + ')' + (p.receiptUrl ? ' <a href="' + esc(p.receiptUrl) + '" target="_blank">📎</a>' : '')).join('، ')}</td></tr>`).join('')}<tr style="font-weight:800"><td colspan="3">الإجمالي</td><td>${num(sum('b'))}</td><td>${num(sum('dsc'))}</td><td>${num(tf)}</td><td>${num(tp)}</td><td>${num(Math.max(0, tf - tp))}</td><td></td></tr></table>`;
   return h;
 }

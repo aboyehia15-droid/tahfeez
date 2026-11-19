@@ -427,30 +427,86 @@ function userForm(u) {
 }
 
 /* ===================== الرسوم ===================== */
-function feeOf(st) { return st.fee !== '' && st.fee != null ? +st.fee : (+S.settings.feeDefault || 0); }
+/* ——— الرسوم: الأساس − (إعفاء / خصم أخوة / خصم خاص) ——— */
+function baseFee(st) { return st.fee !== '' && st.fee != null ? +st.fee : (+S.settings.feeDefault || 0); }
+function discAmt(base, d) { if (!d || !+d.value) return 0; return d.mode === 'amount' ? +d.value : base * (+d.value) / 100; }
+function discountsOf(st) {
+  const base = baseFee(st);
+  if (st.feeExempt) return { base, exempt: base, sib: 0, spec: 0, total: base };
+  const sib = discAmt(base, st.sibDisc), spec = discAmt(base, st.specDisc);
+  const total = Math.min(base, sib + spec);
+  return { base, exempt: 0, sib, spec, total };
+}
+function feeOf(st) { const d = discountsOf(st); return Math.max(0, d.base - d.total); }
 function paidOf(st) { return T('payments').filter(p => p.studentId === st.id).reduce((a, p) => a + (+p.amount || 0), 0); }
+function discLabel(st) {
+  if (st.feeExempt) return `<span class="chip gray">🎓 معفى${st.exemptNote ? ' — ' + esc(st.exemptNote) : ''}</span>`;
+  const out = [];
+  if (st.sibDisc && +st.sibDisc.value) out.push(`<span class="chip blue">👨‍👦 أخوة ${st.sibDisc.mode === 'amount' ? num(st.sibDisc.value) : st.sibDisc.value + '%'}</span>`);
+  if (st.specDisc && +st.specDisc.value) out.push(`<span class="chip gold" title="${esc(st.specDisc.note || '')}">⭐ خاص ${st.specDisc.mode === 'amount' ? num(st.specDisc.value) : st.specDisc.value + '%'}</span>`);
+  return out.join(' ');
+}
+function siblingsOf(st) { const keys = [normPhone(st.guardianPhone), String(st.guardianId || '').trim()].filter(k => k && k.length > 5); return activeStudents().filter(x => x.id !== st.id && ([normPhone(x.guardianPhone), String(x.guardianId || '').trim()].some(k => k && keys.includes(k)))); }
+function discountDialog(st, after) {
+  const d = discountsOf(st); const cur = S.settings.currency; const sib = st.sibDisc || {}, spec = st.specDisc || {};
+  const bros = siblingsOf(st);
+  const modeSel = (id, m) => `<select class="inp" id="${id}" style="width:auto"><option value="percent" ${m !== 'amount' ? 'selected' : ''}>٪ نسبة</option><option value="amount" ${m === 'amount' ? 'selected' : ''}>${cur} مبلغ</option></select>`;
+  const m = modal({ title: '🏷️ الإعفاء والخصومات — ' + esc(st.name), body: `
+    <div class="row" style="margin-bottom:8px"><span>الرسوم الأساسية:</span><input class="inp" type="number" id="db" style="width:120px" value="${d.base}"><span class="muted">${cur}</span></div>
+    <div class="card"><div class="toggle-row" style="border:0"><span><b>🎓 معفى من الرسوم</b></span><label class="switch"><input type="checkbox" id="dx" ${st.feeExempt ? 'checked' : ''}><span></span></label></div>
+      <input class="inp" id="dxn" placeholder="سبب الإعفاء (اختياري)" value="${esc(st.exemptNote || '')}"></div>
+    <div class="card" id="dbox" style="${st.feeExempt ? 'opacity:.4;pointer-events:none' : ''}">
+      <h3>👨‍👦 خصم الأخوة</h3>
+      ${bros.length ? `<div class="small" style="margin-bottom:6px">إخوته المسجلون (بنفس جوال/هوية ولي الأمر): ${bros.map(b => `<span class="chip">${esc(b.name)}</span>`).join(' ')}</div>` : '<div class="small muted" style="margin-bottom:6px">لم يُعثر على إخوة مسجلين بنفس جوال أو هوية ولي الأمر.</div>'}
+      <div class="row"><input class="inp" type="number" id="ds" style="width:120px" value="${sib.value || ''}" placeholder="${S.settings.sibDefault || 0}">${modeSel('dsm', sib.mode)}${S.settings.sibDefault ? `<button class="btn sm ghost" id="dsd">النسبة الافتراضية ${S.settings.sibDefault}%</button>` : ''}</div>
+      <h3 style="margin-top:14px">⭐ خصم خاص</h3>
+      <div class="row"><input class="inp" type="number" id="dp" style="width:120px" value="${spec.value || ''}">${modeSel('dpm', spec.mode)}<input class="inp grow" id="dpn" placeholder="السبب (مثال: ابن معلم، ظروف خاصة…)" value="${esc(spec.note || '')}"></div>
+    </div>
+    <div class="kpis" id="dk"></div>`, foot: '<button class="btn" data-ok>💾 حفظ</button>' });
+  const read = () => ({ fee: +$('#db', m.el).value, feeExempt: $('#dx', m.el).checked, exemptNote: $('#dxn', m.el).value.trim(), sibDisc: { value: +$('#ds', m.el).value || 0, mode: $('#dsm', m.el).value }, specDisc: { value: +$('#dp', m.el).value || 0, mode: $('#dpm', m.el).value, note: $('#dpn', m.el).value.trim() } });
+  const calc = () => { const t = Object.assign({}, st, read()); const dd = discountsOf(t); $('#dbox', m.el).style.cssText = t.feeExempt ? 'opacity:.4;pointer-events:none' : ''; $('#dk', m.el).innerHTML = `<div class="kpi"><div class="v">${num(dd.base)}</div><div class="t">الأساسية</div></div><div class="kpi"><div class="v" style="color:var(--blue)">${num(dd.total)}</div><div class="t">إجمالي الخصم</div></div><div class="kpi"><div class="v" style="color:var(--teal)">${num(Math.max(0, dd.base - dd.total))}</div><div class="t">الصافي المستحق</div></div><div class="kpi"><div class="v" style="color:var(--green)">${num(paidOf(st))}</div><div class="t">المسدد</div></div>`; };
+  calc(); m.body.addEventListener('input', calc); m.body.addEventListener('change', calc);
+  const sd = $('#dsd', m.el); if (sd) sd.onclick = () => { $('#ds', m.el).value = S.settings.sibDefault; $('#dsm', m.el).value = 'percent'; calc(); };
+  $('[data-ok]', m.el).onclick = () => { Object.assign(st, read()); save('students', st); m.close(); toast('✔️ حُفظ'); after && after(); };
+}
+function feesSettingsDialog() {
+  const cur = S.settings.currency;
+  const m = modal({ title: '⚙️ إعدادات الرسوم', body: `<div class="grid g2"><div class="field"><label>الرسوم الافتراضية لكل طالب (${cur})</label><input class="inp" type="number" id="fd" value="${S.settings.feeDefault || 0}"></div>
+    <div class="field"><label>نسبة خصم الأخوة الافتراضية (%)</label><input class="inp" type="number" id="fsd" value="${S.settings.sibDefault || ''}" placeholder="مثال: 10"></div></div>
+    <div class="card" style="background:#f3faf8"><b>👨‍👦 تطبيق خصم الأخوة تلقائياً</b><p class="small">يبحث عن الطلاب المسجلين بنفس جوال أو هوية ولي الأمر، ويطبق النسبة على كل أخ بعد الأول (الأكبر سناً يدفع كامل الرسوم). لا يغيّر من عليه خصم أخوة مسبقاً.</p><button class="btn sm gold" id="fauto">تطبيق الآن</button> <span class="small" id="fres"></span></div>`, foot: '<button class="btn" data-ok>💾 حفظ</button>' });
+  $('#fauto', m.el).onclick = () => {
+    const pct = +$('#fsd', m.el).value; if (!pct) return toast('اكتب نسبة خصم الأخوة أولاً');
+    saveSettings({ sibDefault: pct });
+    const seen = new Set(); let n = 0;
+    activeStudents().forEach(st => { if (seen.has(st.id)) return; const fam = [st].concat(siblingsOf(st)); fam.forEach(x => seen.add(x.id)); if (fam.length < 2) return;
+      fam.sort((a, b) => (a.birthDate || '9') < (b.birthDate || '9') ? -1 : 1).slice(1).forEach(x => { if (x.feeExempt || (x.sibDisc && +x.sibDisc.value)) return; x.sibDisc = { value: pct, mode: 'percent' }; save('students', x); n++; }); });
+    $('#fres', m.el).textContent = '✔️ طُبق على ' + n + ' طالب';
+  };
+  $('[data-ok]', m.el).onclick = () => { saveSettings({ feeDefault: +$('#fd', m.el).value || 0, sibDefault: +$('#fsd', m.el).value || 0 }); m.close(); render(); };
+}
 function viewFees(v) {
   const cur = S.settings.currency;
-  v.innerHTML = `<div class="page-head"><h2>💰 الرسوم والسداد</h2><span class="sp"></span><button class="btn light" id="setfee">⚙️ الرسوم الافتراضية: ${num(S.settings.feeDefault || 0)} ${cur}</button></div>
+  v.innerHTML = `<div class="page-head"><h2>💰 الرسوم والسداد</h2><span class="sp"></span><button class="btn light" id="setfee">⚙️ إعدادات الرسوم (${num(S.settings.feeDefault || 0)} ${cur})</button></div>
     <div class="grid g4" id="fk"></div>
     <div class="card" style="padding:10px;margin-top:12px"><div class="row"><div class="search grow"><input class="inp" id="fq" placeholder="بحث"></div><select class="inp" id="fc" style="width:auto">${classOptions('', 'كل الفصول')}</select>
-      <select class="inp" id="fs" style="width:auto"><option value="">كل الحالات</option><option value="paid">مسدد</option><option value="part">مسدد جزئياً</option><option value="none">غير مسدد</option></select>
+      <select class="inp" id="fs" style="width:auto"><option value="">كل الحالات</option><option value="paid">مسدد</option><option value="part">مسدد جزئياً</option><option value="none">غير مسدد</option><option value="free">🎓 معفى</option><option value="disc">🏷️ عليهم خصم</option><option value="sib">👨‍👦 خصم أخوة</option><option value="spec">⭐ خصم خاص</option></select>
       <button class="btn sm wa" id="remind">💬 تذكير غير المسددين</button><button class="btn sm light" id="fexp">📤 Excel</button></div></div>
     <div class="tbl-wrap"><table class="tbl" id="ft"></table></div>`;
-  const rows = () => { const q = Q.norm($('#fq').value), c = $('#fc').value, s = $('#fs').value; return activeStudents().filter(st => (!c || st.classId === c) && (!q || Q.norm(st.name).includes(q))).map(st => { const f = feeOf(st), p = paidOf(st); return { st, f, p, r: Math.max(0, f - p), state: p >= f && f > 0 ? 'paid' : p > 0 ? 'part' : f > 0 ? 'none' : 'free' }; }).filter(x => !s || x.state === s).sort((a, b) => a.st.name.localeCompare(b.st.name, 'ar')); };
+  const rows = () => { const q = Q.norm($('#fq').value), c = $('#fc').value, s = $('#fs').value; return activeStudents().filter(st => (!c || st.classId === c) && (!q || Q.norm(st.name).includes(q))).map(st => { const d = discountsOf(st); const f = Math.max(0, d.base - d.total), p = paidOf(st); return { st, d, f, p, r: Math.max(0, f - p), state: st.feeExempt || f === 0 ? 'free' : p >= f ? 'paid' : p > 0 ? 'part' : 'none' }; })
+    .filter(x => !s || (s === 'disc' ? x.d.sib + x.d.spec > 0 : s === 'sib' ? x.d.sib > 0 : s === 'spec' ? x.d.spec > 0 : x.state === s)).sort((a, b) => a.st.name.localeCompare(b.st.name, 'ar')); };
   const draw = () => {
-    const all = activeStudents().map(st => ({ f: feeOf(st), p: paidOf(st) }));
-    const tf = all.reduce((a, x) => a + x.f, 0), tp = all.reduce((a, x) => a + x.p, 0);
-    $('#fk').innerHTML = `<div class="stat"><span class="i">🧾</span><div class="n">${num(tf, 0)}</div><div class="l">إجمالي المستحق (${cur})</div></div><div class="stat"><span class="i">✅</span><div class="n" style="color:var(--green)">${num(tp, 0)}</div><div class="l">المسدد</div></div><div class="stat"><span class="i">⏳</span><div class="n" style="color:var(--red)">${num(Math.max(0, tf - tp), 0)}</div><div class="l">المتبقي</div></div><div class="stat"><span class="i">📈</span><div class="n">${tf ? Math.round(tp / tf * 100) : 0}%</div><div class="l">نسبة التحصيل</div></div>`;
+    const all = activeStudents().map(st => { const d = discountsOf(st); return { b: d.base, dsc: d.total, f: Math.max(0, d.base - d.total), p: paidOf(st) }; });
+    const sum = k => all.reduce((a, x) => a + x[k], 0); const tf = sum('f'), tp = sum('p');
+    $('#fk').innerHTML = `<div class="stat"><span class="i">🧾</span><div class="n">${num(tf, 0)}</div><div class="l">صافي المستحق (${cur})${sum('dsc') ? `<br><small>الأساسي ${num(sum('b'), 0)} − خصومات وإعفاءات ${num(sum('dsc'), 0)}</small>` : ''}</div></div><div class="stat"><span class="i">✅</span><div class="n" style="color:var(--green)">${num(tp, 0)}</div><div class="l">المسدد</div></div><div class="stat"><span class="i">⏳</span><div class="n" style="color:var(--red)">${num(Math.max(0, tf - tp), 0)}</div><div class="l">المتبقي</div></div><div class="stat"><span class="i">📈</span><div class="n">${tf ? Math.round(tp / tf * 100) : 0}%</div><div class="l">نسبة التحصيل</div></div>`;
     const R = rows();
-    $('#ft').innerHTML = `<tr><th>م</th><th>الطالب</th><th>الفصل</th><th>الرسوم</th><th>المسدد</th><th>المتبقي</th><th>الحالة</th><th>الإيصالات</th><th></th></tr>` + R.map((x, i) => `<tr><td>${i + 1}</td><td class="r"><b>${esc(x.st.name)}</b></td><td>${esc((classOf(x.st) || {}).name || '')}</td><td>${num(x.f)}</td><td style="color:var(--green);font-weight:700">${num(x.p)}</td><td style="color:${x.r ? 'var(--red)' : ''};font-weight:700">${num(x.r)}</td><td>${{ paid: '<span class="chip green">مسدد</span>', part: '<span class="chip gold">جزئي</span>', none: '<span class="chip red">غير مسدد</span>', free: '<span class="chip gray">معفى</span>' }[x.state]}</td><td>${T('payments').filter(p => p.studentId === x.st.id && p.receiptUrl).map(p => `<a href="${esc(p.receiptUrl)}" target="_blank" title="${num(p.amount)} — ${fmtDate(p.date, false)}" style="text-decoration:none">📎</a>`).join(' ')}</td><td><button class="btn sm" data-pay="${x.st.id}">💰 الدفعات</button></td></tr>`).join('');
+    $('#ft').innerHTML = `<tr><th>م</th><th>الطالب</th><th>الفصل</th><th>الرسوم</th><th>الخصم / الإعفاء</th><th>الصافي</th><th>المسدد</th><th>المتبقي</th><th>الحالة</th><th>الإيصالات</th><th></th></tr>` + R.map((x, i) => `<tr><td>${i + 1}</td><td class="r"><b>${esc(x.st.name)}</b></td><td>${esc((classOf(x.st) || {}).name || '')}</td><td>${num(x.d.base)}</td><td>${x.d.total ? `<b style="color:var(--blue)">${num(x.d.total)}</b><br>` : ''}${discLabel(x.st)}</td><td><b>${num(x.f)}</b></td><td style="color:var(--green);font-weight:700">${num(x.p)}</td><td style="color:${x.r ? 'var(--red)' : ''};font-weight:700">${num(x.r)}${x.p > x.f ? `<br><span class="chip blue" title="مبلغ مدفوع زيادة عن الصافي">زيادة ${num(x.p - x.f)}</span>` : ''}</td><td>${{ paid: '<span class="chip green">مسدد</span>', part: '<span class="chip gold">جزئي</span>', none: '<span class="chip red">غير مسدد</span>', free: '<span class="chip gray">معفى</span>' }[x.state]}</td><td>${T('payments').filter(p => p.studentId === x.st.id && p.receiptUrl).map(p => `<a href="${esc(p.receiptUrl)}" target="_blank" title="${num(p.amount)} — ${fmtDate(p.date, false)}" style="text-decoration:none">📎</a>`).join(' ')}</td><td style="white-space:nowrap"><button class="btn sm light" data-disc="${x.st.id}" title="الإعفاء والخصومات">🏷️</button> <button class="btn sm" data-pay="${x.st.id}">💰 الدفعات</button></td></tr>`).join('');
   };
   draw();
   ['#fq', '#fc', '#fs'].forEach(s => $(s).addEventListener('input', draw));
-  $('#ft').onclick = e => { const b = e.target.closest('[data-pay]'); if (b) paymentDialog(byId('students', b.dataset.pay), draw); };
-  $('#setfee').onclick = () => { const val = prompt('الرسوم الافتراضية لكل طالب (' + cur + ')', S.settings.feeDefault || 0); if (val != null) { saveSettings({ feeDefault: +val || 0 }); render(); } };
+  $('#ft').onclick = e => { const b = e.target.closest('[data-pay]'); if (b) paymentDialog(byId('students', b.dataset.pay), draw); const d = e.target.closest('[data-disc]'); if (d) discountDialog(byId('students', d.dataset.disc), draw); };
+  $('#setfee').onclick = feesSettingsDialog;
   $('#remind').onclick = () => waQueueDialog(rows().filter(x => x.r > 0).map(x => ({ name: x.st.name, phone: x.st.guardianPhone, text: fillTpl(S.settings.waFee, { student: x.st.name, remaining: num(x.r), link: parentLink(x.st) }) })), 'تذكير بالرسوم');
-  $('#fexp').onclick = async () => { await loadXLSX(); const ws = XLSX.utils.json_to_sheet(rows().map((x, i) => ({ 'م': i + 1, 'الطالب': x.st.name, 'الفصل': (classOf(x.st) || {}).name || '', 'الرسوم': x.f, 'المسدد': x.p, 'المتبقي': x.r }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الرسوم'); XLSX.writeFile(wb, 'الرسوم.xlsx'); };
+  $('#fexp').onclick = async () => { await loadXLSX(); const ws = XLSX.utils.json_to_sheet(rows().map((x, i) => ({ 'م': i + 1, 'الطالب': x.st.name, 'الفصل': (classOf(x.st) || {}).name || '', 'الرسوم': x.d.base, 'خصم الأخوة': x.d.sib, 'خصم خاص': x.d.spec, 'إعفاء': x.d.exempt, 'الصافي': x.f, 'المسدد': x.p, 'المتبقي': x.r }))); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الرسوم'); XLSX.writeFile(wb, 'الرسوم.xlsx'); };
 }
 function fileToDataURL(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); }); }
 async function uploadReceipt(dataURL, name) {
@@ -484,7 +540,7 @@ function paymentDialog(st, after) {
   const cur = S.settings.currency;
   const drawBody = () => { const pays = T('payments').filter(p => p.studentId === st.id).sort((a, b) => a.date < b.date ? 1 : -1); const f = feeOf(st), p = paidOf(st); return `
     <div class="kpis"><div class="kpi"><div class="v">${num(f)}</div><div class="t">الرسوم</div></div><div class="kpi"><div class="v" style="color:var(--green)">${num(p)}</div><div class="t">المسدد</div></div><div class="kpi"><div class="v" style="color:var(--red)">${num(Math.max(0, f - p))}</div><div class="t">المتبقي</div></div></div>
-    <div class="row"><span class="small muted">الرسوم المقررة لهذا الطالب:</span><input class="inp" id="pfee" type="number" style="width:110px" value="${f}"><button class="btn sm light" id="savefee">حفظ</button></div>
+    <div class="row"><span class="small muted">الرسوم الأساسية: <b>${num(baseFee(st))}</b>${discountsOf(st).total ? ' — الخصم: <b style="color:var(--blue)">' + num(discountsOf(st).total) + '</b>' : ''}</span> ${discLabel(st)}<button class="btn sm light" id="savefee">🏷️ الرسوم والإعفاء والخصومات</button></div>
     <div class="rep-sec">سجل الدفعات</div>${pays.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th><th>ملاحظة</th><th>الإيصال</th><th></th></tr>${pays.map(x => `<tr><td>${fmtDate(x.date, false)}</td><td><b>${num(x.amount)}</b></td><td>${esc(x.method || '')}</td><td class="small">${esc(x.note || '')}</td><td>${receiptLink(x) || '<span class="muted small">—</span>'}</td><td style="white-space:nowrap"><button class="btn sm light" data-ep="${x.id}" title="تعديل أو حذف">✏️</button> <button class="btn sm ghost" data-rc="${x.id}" title="سند قبض">🧾</button></td></tr>`).join('')}</table>` : '<div class="empty small">لا توجد دفعات</div>'}
     <div class="card" style="margin-top:10px"><h3>➕ تسجيل دفعة جديدة</h3><div class="grid g2">
       <div class="field"><label>المبلغ (${cur})</label><input class="inp" id="pa" type="number" value="${Math.max(0, f - p) || ''}"></div>
@@ -497,7 +553,7 @@ function paymentDialog(st, after) {
   let file = null;
   const redraw = () => { file = null; m.body.innerHTML = drawBody(); bind(); };
   const bind = () => {
-    $('#savefee', m.el).onclick = () => { st.fee = +$('#pfee', m.el).value; save('students', st); redraw(); };
+    $('#savefee', m.el).onclick = () => discountDialog(st, redraw);
     $('#pf', m.el).onchange = async e => { file = await pickReceiptFile(e.target.files[0]); $('#pfn', m.el).textContent = file ? '✔️ ' + file.name : ''; };
     $('#addpay', m.el).onclick = async () => {
       const a = +$('#pa', m.el).value; if (!a) return toast('اكتب المبلغ');
