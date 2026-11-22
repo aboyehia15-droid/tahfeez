@@ -1,5 +1,5 @@
 /* ===== النواة: البيانات والتخزين والاتصال بالخادم وأدوات عامة ===== */
-const TABLE_NAMES = ['students', 'classes', 'users', 'records', 'payments', 'invites', 'exams', 'results', 'settings'];
+const TABLE_NAMES = ['students', 'classes', 'users', 'records', 'payments', 'invites', 'exams', 'results', 'settings', 'outbox'];
 const LS = { data: 'tz_data', sess: 'tz_session', server: 'tz_server', queue: 'tz_queue' };
 
 const DEFAULT_SETTINGS = {

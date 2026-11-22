@@ -9,6 +9,7 @@ function NAV() {
     canAdmin() && { k: 'classes', t: 'الفصول والمعلمون', ic: '🏫' },
     { k: 'exams', t: 'الاختبارات', ic: '📝' },
     { k: 'reports', t: 'التقارير', ic: '📊' },
+    canAdmin() && (S.settings.waMode === 'center' || T('outbox').length) && { k: 'outbox', t: 'صندوق رسائل الواتساب', ic: '📮', badge: T('outbox').filter(x => x.status !== 'sent').length || '' },
     f.leaders && { k: 'leaders', t: 'الأوائل والترتيب', ic: '🏆' },
     canAdmin() && f.fees && { k: 'fees', t: 'الرسوم', ic: '💰' },
     isAdmin() && { k: 'settings', t: 'الإعدادات', ic: '⚙️' }
@@ -223,7 +224,21 @@ function waQueueDialog(items, title) {
   draw();
   m.body.addEventListener('click', e => { const a = e.target.closest('a[data-j]'); if (!a) return; const x = items[+a.dataset.j]; x.sent = true; x.onSent && x.onSent(); setTimeout(draw, 300); });
   $('[data-next]', m.el).onclick = () => { const x = items.find(y => !y.sent); if (!x) return toast('✔️ تم الإرسال للجميع'); window.open(waLink(x.phone, x.text), '_blank'); x.sent = true; x.onSent && x.onSent(); draw(); };
-  const au = $('[data-auto]', m.el); if (au) au.onclick = async () => { au.disabled = true; au.textContent = '⏳ جاري الإرسال…'; try { const r = await api('sendWA', { messages: items.filter(x => !x.sent).map(x => ({ to: '+' + normPhone(x.phone), body: x.text })) }); if (!r.ok) throw new Error(r.error); r.results.forEach(res => { const x = items.find(y => '+' + normPhone(y.phone) === res.to); if (x && res.ok) { x.sent = true; x.onSent && x.onSent(); } }); draw(); toast('✔️ تم الإرسال التلقائي'); } catch (e) { toast('⚠️ ' + e.message); } au.disabled = false; au.textContent = '⚡ إرسال تلقائي للجميع'; };
+  // الإرسال الآلي: دفعات صغيرة (10 رسائل) مع مهلة عشوائية بين كل رسالة في الخادم، حتى لا يُحظر الرقم
+  const au = $('[data-auto]', m.el); if (au) au.onclick = async () => {
+    au.disabled = true;
+    try {
+      while (true) {
+        const batch = items.filter(x => !x.sent && !x.failed).slice(0, 10); if (!batch.length) break;
+        au.textContent = `⏳ جاري الإرسال… ${items.filter(x => x.sent).length} / ${items.length}`;
+        const r = await api('sendWA', { messages: batch.map(x => ({ to: '+' + normPhone(x.phone), body: x.text })) }); if (!r.ok) throw new Error(r.error);
+        batch.forEach(x => { const res = r.results.find(y => y.to === '+' + normPhone(x.phone)); if (res && res.ok) { x.sent = true; x.onSent && x.onSent(); } else x.failed = true; });
+        draw();
+      }
+      const bad = items.filter(x => x.failed && !x.sent).length; toast(bad ? `⚠️ تعذر إرسال ${bad} — أرسلها يدوياً` : '✔️ تم الإرسال التلقائي'); items.forEach(x => delete x.failed); draw();
+    } catch (e) { toast('⚠️ ' + e.message); }
+    au.disabled = false; au.textContent = '⚡ إرسال تلقائي للجميع';
+  };
 }
 function viewStudents(v, sub) {
   if (sub === 'new') { setTimeout(() => studentForm(), 50); history.replaceState(null, '', '#/students'); }
@@ -414,6 +429,7 @@ function userForm(u) {
     <div class="field"><label class="req">الاسم</label><input class="inp" id="un" value="${esc(u.name || '')}"></div>
     <div class="field"><label>الجوال (واتساب)</label><input class="inp" id="up" dir="ltr" value="${esc(u.phone || '')}"></div>
     <div class="field"><label>الصلاحية</label><select class="inp" id="ur"><option value="teacher" ${u.role === 'teacher' ? 'selected' : ''}>معلم (يرى فصوله فقط)</option><option value="supervisor" ${u.role === 'supervisor' ? 'selected' : ''}>مشرف (يرى الجميع والتقارير)</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>مدير (كل الصلاحيات)</option></select></div>
+    <div class="field"><label>إرسال الواتساب لأولياء الأمور</label><select class="inp" id="uwm"><option value="" ${!u.waMode ? 'selected' : ''}>حسب الإعداد العام</option><option value="own" ${u.waMode === 'own' ? 'selected' : ''}>من واتساب المعلم نفسه</option><option value="center" ${u.waMode === 'center' ? 'selected' : ''}>عبر واتساب الإدارة (صندوق الرسائل)</option></select></div>
     <div class="field"><label>اسم المستخدم للدخول</label><input class="inp" id="uu" dir="ltr" value="${esc(u.username || '')}"></div>
     <div class="field"><label>${u.id ? 'كلمة مرور جديدة (اتركها فارغة لعدم التغيير)' : 'كلمة المرور'}</label><input class="inp" id="upw" dir="ltr" type="text"></div>
     <div class="toggle-row"><span>الحساب مفعّل</span><label class="switch"><input type="checkbox" id="ua" ${u.active !== false ? 'checked' : ''}><span></span></label></div></div>`,
@@ -423,7 +439,7 @@ function userForm(u) {
     const username = $('#uu', m.el).value.trim(); const pw = $('#upw', m.el).value;
     if (username && T('users').some(x => x.id !== u.id && x.username === username)) return toast('اسم المستخدم مستخدم');
     if (!isLocal() && !u.id && username && !pw) return toast('اكتب كلمة المرور');
-    Object.assign(u, { name, phone: $('#up', m.el).value.trim(), role: $('#ur', m.el).value, username, active: $('#ua', m.el).checked });
+    Object.assign(u, { name, phone: $('#up', m.el).value.trim(), role: $('#ur', m.el).value, username, active: $('#ua', m.el).checked, waMode: $('#uwm', m.el).value });
     if (!u.id) u.id = uid('u');
     const row = Object.assign({}, u); if (pw) row.password = pw;
     save('users', row); delete row.password; const i = T('users').findIndex(x => x.id === u.id); T('users')[i] = u; persist();
@@ -647,10 +663,15 @@ function viewSettings(v, sub) {
       <div class="toggle-row"><span>إظهار الإعفاء والخصومات (أخوة / خاص) لولي الأمر <span class="small muted">— عند الإيقاف يرى المبلغ المستحق فقط</span></span><label class="switch"><input type="checkbox" id="psd" ${st.parentShowDisc ? 'checked' : ''}><span></span></label></div>
       <div class="toggle-row"><span>🔗 اختصار روابط أولياء الأمور أكثر (مثل is.gd/AbC12x) <span class="small muted">— يحتاج تحديث كود الخادم</span></span><label class="switch"><input type="checkbox" id="pshort" ${st.shortLinks ? 'checked' : ''}><span></span></label></div>
       <div class="toggle-row"><span>عرض ترتيب الطالب في فصله لولي الأمر</span><label class="switch"><input type="checkbox" id="psr" ${st.parentShowRank !== false ? 'checked' : ''}><span></span></label></div></div>
+      <div class="card"><h3>💬 من أين تُرسل رسائل الواتساب لأولياء الأمور؟</h3>
+        <label class="toggle-row" style="cursor:pointer"><span><input type="radio" name="wam" value="own" ${st.waMode !== 'center' ? 'checked' : ''}> <b>كل معلم من واتسابه لطلابه</b><br><span class="small muted">يفتح الواتساب على جوال المعلم برسالة جاهزة — الرسائل موزعة على أرقام المعلمين فلا يُحمَّل رقم واحد</span></span></label>
+        <label class="toggle-row" style="cursor:pointer"><span><input type="radio" name="wam" value="center" ${st.waMode === 'center' ? 'checked' : ''}> <b>كل الرسائل من واتساب الإدارة</b><br><span class="small muted">رسائل المعلمين تذهب إلى «📮 صندوق رسائل الواتساب» عندك، فترسلها من رقمك (واحدة واحدة أو تلقائياً إن فعّلت المزود أدناه)</span></span></label>
+        <p class="small muted" style="margin:6px 0 0">يمكن استثناء معلم بعينه من «الفصول والمعلمون» ← تعديل المعلم ← «إرسال الواتساب».</p>
+        <div class="small" style="background:var(--gold-2);border-radius:10px;padding:8px 10px;margin-top:8px">🛡️ <b>لتجنب حظر الرقم:</b> اطلب من أولياء الأمور حفظ الرقم المرسِل، وأرسل على دفعات، ولا ترسل لأرقام لم تتواصل معك من قبل بكثرة. الإرسال التلقائي هنا يرسل 10 رسائل في كل دفعة مع مهلة عشوائية بين كل رسالة.</div></div>
       <div class="card"><h3>📲 مزود الواتساب للإرسال الآلي (اختياري)</h3><p class="small muted">بدونه يعمل الإرسال بفتح الواتساب برسالة جاهزة لكل رقم. للإرسال الآلي الكامل اشترك في خدمة UltraMsg ثم ضع البيانات هنا (تعمل بعد الربط بالخادم).</p>
       <div class="grid g2"><div class="field"><label>Instance ID</label><input class="inp" id="wai" dir="ltr" value="${esc(st.waInstance || '')}"></div><div class="field"><label>Token</label><input class="inp" id="wat" dir="ltr" value="${esc(st.waToken || '')}"></div></div>
       <div class="toggle-row"><span>تفعيل الإرسال الآلي</span><label class="switch"><input type="checkbox" id="waa" ${st.waAuto ? 'checked' : ''}><span></span></label></div></div>`;
-    box.onchange = () => { const fe = {}; $$('[data-f]', box).forEach(i => fe[i.dataset.f] = i.checked); saveSettings({ features: fe, parentShowFees: $('#psf').checked, parentShowRank: $('#psr').checked, shortLinks: $('#pshort').checked, parentShowDisc: $('#psd').checked, waInstance: $('#wai').value.trim(), waToken: $('#wat').value.trim(), waAuto: $('#waa').checked }); toast('✔️ حُفظ'); };
+    box.onchange = () => { const fe = {}; $$('[data-f]', box).forEach(i => fe[i.dataset.f] = i.checked); saveSettings({ features: fe, parentShowFees: $('#psf').checked, parentShowRank: $('#psr').checked, shortLinks: $('#pshort').checked, parentShowDisc: $('#psd').checked, waInstance: $('#wai').value.trim(), waToken: $('#wat').value.trim(), waAuto: $('#waa').checked, waMode: ($('[name=wam]:checked', box) || {}).value || 'own' }); toast('✔️ حُفظ'); render(); };
   }
   if (sub === 'zad') {
     const z = zadCurriculum();
@@ -829,4 +850,32 @@ function closeYearDialog() {
     saveSettings({ years: (S.settings.years || []).concat([{ name: cur, to, closedAt: Date.now() }]), year: nw, feeDefault: fee });
     m.close(); S.viewYear = ''; toast('✔️ أُغلق العام ' + cur + ' وبدأ العام ' + nw, 4000); location.hash = '#/home'; render();
   };
+}
+
+
+/* ===================== 📮 صندوق رسائل الواتساب (رسائل المعلمين تُرسل من واتساب الإدارة) ===================== */
+function viewOutbox(v) {
+  const tab = sessionStorage.getItem('obt') || 'pending';
+  const all = T('outbox').slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const pend = all.filter(x => x.status !== 'sent'), sent = all.filter(x => x.status === 'sent');
+  const list = tab === 'sent' ? sent.slice(0, 200) : pend;
+  const groups = {}; list.forEach(x => { const g = (x.byName || 'الإدارة') + ' — ' + (x.title || 'رسالة'); (groups[g] = groups[g] || []).push(x); });
+  v.innerHTML = `<div class="page-head"><h2>📮 صندوق رسائل الواتساب</h2><span class="sp"></span>${tab !== 'sent' && pend.length ? `<button class="btn wa" id="ob-send">📤 إرسال المحدد</button><button class="btn ghost" id="ob-del">🗑️ حذف المحدد</button>` : ''}</div>
+    <div class="tabs"><button data-t="pending" class="${tab !== 'sent' ? 'on' : ''}">بانتظار الإرسال (${pend.length})</button><button data-t="sent" class="${tab === 'sent' ? 'on' : ''}">تم إرسالها (${sent.length})</button></div>
+    ${S.settings.waMode !== 'center' ? '<div class="card small" style="background:var(--gold-2)">ℹ️ الإرسال الآن «كل معلم من واتسابه». لتحويل رسائل المعلمين إلى هنا: الإعدادات ← الخصائص ← «كل الرسائل من واتساب الإدارة».</div>' : ''}
+    ${list.length ? `${tab !== 'sent' ? '<label class="row small" style="margin:4px 6px"><input type="checkbox" id="ob-all" checked> تحديد الكل</label>' : ''}${Object.entries(groups).map(([g, xs]) => `<div class="card" style="padding:10px 12px"><h3 style="font-size:17px">${esc(g)} <span class="chip">${xs.length}</span></h3>${xs.map(x => `<div class="list-item" style="align-items:flex-start">${tab !== 'sent' ? `<input type="checkbox" class="ob" data-id="${x.id}" checked style="margin-top:6px">` : ''}<div style="flex:1"><b>${esc(x.name || '')}</b> <span dir="ltr" class="muted small">${esc(x.phone || '')}</span><div class="small muted">${new Date(x.createdAt || 0).toLocaleString('ar-SA-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' })}${x.sentAt ? ' · أُرسلت ' + new Date(x.sentAt).toLocaleString('ar-SA-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div><details class="small"><summary style="cursor:pointer;color:var(--teal)">عرض الرسالة</summary><div style="white-space:pre-wrap;background:#e7fbe0;border-radius:10px;padding:8px;margin-top:4px">${esc(x.text || '')}</div></details></div></div>`).join('')}</div>`).join('')}` : `<div class="empty"><span class="e">${tab === 'sent' ? '📭' : '✅'}</span>${tab === 'sent' ? 'لا توجد رسائل مرسلة بعد' : 'لا توجد رسائل بانتظار الإرسال'}</div>`}`;
+  $$('.tabs button', v).forEach(b => b.onclick = () => { sessionStorage.setItem('obt', b.dataset.t); render(); });
+  const chosen = () => $$('.ob:checked', v).map(c => byId('outbox', c.dataset.id)).filter(Boolean);
+  const oa = $('#ob-all'); if (oa) oa.onchange = e => $$('.ob', v).forEach(c => c.checked = e.target.checked);
+  const sb = $('#ob-send'); if (sb) sb.onclick = () => { const xs = chosen(); if (!xs.length) return toast('حدد رسائل أولاً');
+    waQueueDialog(xs.map(x => ({ name: x.name, phone: x.phone, text: x.text, onSent: () => { x.status = 'sent'; x.sentAt = Date.now(); x.sentBy = S.me ? S.me.name : ''; save('outbox', x); if (x.kind === 'parent' && x.studentId) { const st = byId('students', x.studentId); if (st) { st.linkSentAt = Date.now(); save('students', st); } } } })), '📮 إرسال رسائل الصندوق');
+    const mm = $$('.modal-bg').pop(); if (mm) { const obs = new MutationObserver(() => { if (!document.body.contains(mm)) { obs.disconnect(); render(); } }); obs.observe(document.body, { childList: true }); } };
+  const db = $('#ob-del'); if (db) db.onclick = async () => { const xs = chosen(); if (!xs.length) return toast('حدد رسائل أولاً'); if (await confirmBox(`حذف ${xs.length} رسالة دون إرسالها؟`)) { xs.forEach(x => remove('outbox', x.id)); render(); } };
+}
+/* طريقة الإرسال للمستخدم الحالي */
+function waModeNow() { if (isLocal() || canAdmin()) return 'own'; return (S.me && S.me.waMode) || S.settings.waMode || 'own'; }
+function queueOutbox(items, title, kind) {
+  const now = Date.now();
+  items.forEach((it, i) => save('outbox', { id: uid('o'), by: S.me ? S.me.id : '', byName: S.me ? S.me.name : '', name: it.name, phone: it.phone, text: it.text, studentId: it.studentId || '', classId: it.classId || '', kind, title, status: 'pending', createdAt: now + i }));
+  toast(`📮 حُوِّلت ${items.length} رسالة إلى الإدارة لإرسالها من واتساب المجمع`, 4000);
 }

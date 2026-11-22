@@ -1,5 +1,5 @@
 /* ===================== التشغيل والتنقل ===================== */
-const ROUTES = { home: viewHome, daily: viewDaily, students: viewStudents, register: viewRegister, classes: viewClasses, reports: viewReports, exams: viewExams, leaders: viewLeaders, fees: viewFees, settings: viewSettings };
+const ROUTES = { home: viewHome, daily: viewDaily, students: viewStudents, register: viewRegister, classes: viewClasses, reports: viewReports, exams: viewExams, leaders: viewLeaders, fees: viewFees, settings: viewSettings, outbox: viewOutbox };
 const URLQ = new URLSearchParams(location.search);
 
 function render() {

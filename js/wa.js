@@ -108,11 +108,12 @@ function waCompose(kind, students, ctx = {}, title) {
         ${students.length > 1 ? `<div class="sec"><div class="sec-h">👥 إلى من؟ <span class="sp"></span><span class="chip" id="wcount"></span></div><div id="wto"></div>${students.some(s => !s.guardianPhone) ? `<div class="small" style="color:var(--red);margin-top:6px">⚠️ بدون رقم جوال: ${students.filter(s => !s.guardianPhone).map(s => esc(s.name)).join('، ')}</div>` : ''}</div>` : ''}</div>
       <div class="sec"><div class="sec-h">👁️ معاينة الرسالة<span class="sp"></span>${students.length > 1 ? '<select class="inp" id="wprev" style="width:auto;max-width:60%;font-size:15px"></select>' : ''}</div><div id="wpv" style="white-space:pre-wrap;background:#e7fbe0;border-radius:14px 14px 4px 14px;padding:12px;font-size:16px;line-height:1.8;max-height:50vh;overflow:auto;box-shadow:0 1px 2px rgba(0,0,0,.1)"></div></div>
     </div>`, foot: `<button class="btn wa" data-go>📤 متابعة للإرسال</button><label class="row small" style="align-self:center"><input type="checkbox" id="wsave" checked> حفظ اختياري للمرة القادمة</label>` });
+  const goLbl = waModeNow() === 'center' ? '📮 إرسال إلى الإدارة' : '📤 متابعة للإرسال';
   const draw = () => {
     const pv = $('#wprev', m.el); const cur = pv ? byId('students', pv.value) || students[0] : students[0];
     $('#wpv', m.el).textContent = waBuild(kind, cur, ctx, o);
     const c = $('#wcount', m.el); if (c) c.textContent = sel.length + ' ولي أمر';
-    $('[data-go]', m.el).textContent = '📤 متابعة للإرسال (' + sel.length + ')';
+    $('[data-go]', m.el).textContent = goLbl + ' (' + sel.length + ')';
   };
   if (students.length > 1) {
     $('#wto', m.el).appendChild(multiDrop([{ name: '', items: students.filter(s => s.guardianPhone).map(s => ({ key: s.id, t: s.name })) }], sel, 'المستلمون', k => { sel = k; const pv = $('#wprev', m.el); if (pv) { const keep = pv.value; pv.innerHTML = sel.map(id => `<option value="${id}">${esc(byId('students', id).name)}</option>`).join(''); if (sel.includes(keep)) pv.value = keep; } draw(); }));
@@ -126,8 +127,8 @@ function waCompose(kind, students, ctx = {}, title) {
     if (!list.length) return toast(students.length === 1 ? 'لا يوجد رقم جوال لولي الأمر' : 'اختر المستلمين');
     if ($('#wsave', m.el).checked) { const p = Object.assign({}, S.settings.waPrefs || {}); const c = Object.assign({}, o); delete c.extra; c._v = 2; p[kind] = c; if (!viewingArchive()) saveSettings({ waPrefs: p }); }
     m.close();
-    const items = list.map(s => ({ name: s.name, phone: s.guardianPhone, text: waBuild(kind, s, ctx, o), onSent: () => { if (kind === 'parent') { s.linkSentAt = Date.now(); save('students', s); } } }));
-    const go = () => { if (items.length === 1) { window.open(waLink(items[0].phone, items[0].text), '_blank'); items[0].onSent(); } else waQueueDialog(items, title || K.title); };
+    const items = list.map(s => ({ name: s.name, phone: s.guardianPhone, studentId: s.id, classId: s.classId, text: waBuild(kind, s, ctx, o), onSent: () => { if (kind === 'parent') { s.linkSentAt = Date.now(); save('students', s); } } }));
+    const go = () => { if (waModeNow() === 'center') return queueOutbox(items, title || K.title, kind); if (items.length === 1) { window.open(waLink(items[0].phone, items[0].text), '_blank'); items[0].onSent(); } else waQueueDialog(items, title || K.title); };
     if (S.settings.shortLinks && !isLocal() && o.link) {
       const urls = [...new Set(items.flatMap(it => it.text.match(/https?:\/\/\S*\?p=\S+/g) || []))];
       toast('⏳ جاري اختصار الروابط…', 5000);

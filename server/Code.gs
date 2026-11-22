@@ -22,7 +22,8 @@ var TABLES = {
   invites:  ['id', 'phone', 'name', 'sentAt', 'updatedAt', 'json'],
   exams:    ['id', 'title', 'kind', 'date', 'updatedAt', 'json'],
   results:  ['id', 'examId', 'studentId', 'classId', 'date', 'updatedAt', 'json'],
-  settings: ['id', 'updatedAt', 'json']
+  settings: ['id', 'updatedAt', 'json'],
+  outbox:   ['id', 'by', 'studentId', 'status', 'createdAt', 'updatedAt', 'json'] // رسائل المعلمين المحوّلة للإدارة لترسلها من واتسابها
 };
 var SECRET_FIELDS = ['passHash'];
 
@@ -239,6 +240,7 @@ function route_(r) {
       data.records = data.records.filter(function (x) { return my.indexOf(x.classId) >= 0; });
       data.results = data.results.filter(function (x) { return my.indexOf(x.classId) >= 0; });
       data.exams = data.exams.filter(function (e) { return (e.classIds || []).some(function (c) { return my.indexOf(c) >= 0; }); });
+      data.outbox = data.outbox.filter(function (x) { return x.by === me.id; });
       data.payments = []; data.invites = [];
       data.users = data.users.map(function (u) { return { id: u.id, name: u.name, role: u.role }; });
       data.settings = data.settings.map(function (x) { var c = {}; for (var k in x) if (k !== 'waToken' && k !== 'waInstance') c[k] = x[k]; return c; });
@@ -248,8 +250,9 @@ function route_(r) {
 
   if (a === 'save') {
     if (!TABLES[r.table]) return { ok: false, error: 'جدول غير معروف' };
-    if (me.role === 'teacher' && ['records', 'students', 'results', 'exams'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
+    if (me.role === 'teacher' && ['records', 'students', 'results', 'exams', 'outbox'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
     var rows = r.rows || [];
+    if (r.table === 'outbox' && me.role === 'teacher') rows.forEach(function (x) { x.by = me.id; x.byName = me.name; });
     if (r.table === 'users') {
       if (me.role !== 'admin') return { ok: false, error: 'للمدير فقط' };
       var old = readAll_('users');
@@ -264,7 +267,7 @@ function route_(r) {
   }
 
   if (a === 'del') {
-    if (me.role === 'teacher' && ['records', 'results', 'exams'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
+    if (me.role === 'teacher' && ['records', 'results', 'exams', 'outbox'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
     var sh = sheet_(r.table);
     var last = sh.getLastRow();
     if (last >= 2) {
@@ -325,7 +328,7 @@ function route_(r) {
           payload: { token: tk, to: m.to, body: m.body }
         });
         results.push({ to: m.to, ok: resp.getResponseCode() === 200, res: resp.getContentText().slice(0, 200) });
-        Utilities.sleep(1200);
+        Utilities.sleep(6000 + Math.floor(Math.random() * 7000)); // مهلة عشوائية بين الرسائل حتى لا يُحظر الرقم
       } catch (err) { results.push({ to: m.to, ok: false, res: String(err) }); }
     });
     return { ok: true, results: results };
