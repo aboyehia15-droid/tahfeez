@@ -111,6 +111,7 @@ function stripSecrets_(list) {
   });
 }
 
+function pwNorm_(v) { return String(v == null ? '' : v).replace(/[٠-٩]/g, function (d) { return d.charCodeAt(0) - 1632; }).replace(/[۰-۹]/g, function (d) { return d.charCodeAt(0) - 1776; }).replace(/\s+/g, '').toLowerCase(); }
 function hash_(s) {
   var salt = PropertiesService.getScriptProperties().getProperty('SALT');
   if (!salt) { salt = Utilities.getUuid(); PropertiesService.getScriptProperties().setProperty('SALT', salt); }
@@ -276,7 +277,7 @@ function route_(r) {
       var old = readAll_('users');
       rows.forEach(function (u) {
         var o = old.filter(function (x) { return x.id === u.id; })[0];
-        if (u.password) { u.passHash = hash_(u.password); delete u.password; }
+        if (u.password) { u.passHash = hash_(pwNorm_(u.password)); delete u.password; } // تُحفظ موحّدة: أرقام إنجليزية، بلا مسافات، أحرف صغيرة
         else if (o) u.passHash = o.passHash;
         if (o && o.loginKey && !u.loginKey) u.loginKey = o.loginKey; // رابط الدخول المباشر يبقى كما هو
       });
