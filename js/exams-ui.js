@@ -19,9 +19,10 @@ function viewExams(v, sub, arg) {
   if (sub === 'grade') return examGrading(v, arg);
   const fk = sessionStorage.getItem('exk') || '';
   const my = myClasses().map(c => c.id);
-  const list = T('exams').filter(e => (!fk || e.kind === fk) && (canAdmin() || (e.classIds || []).some(c => my.includes(c)))).sort((a, b) => a.date < b.date ? 1 : -1);
+  const mine = T('exams').filter(e => canAdmin() || (e.classIds || []).some(c => my.includes(c)));
+  const list = mine.filter(e => !fk || e.kind === fk).sort((a, b) => a.date < b.date ? 1 : -1);
   v.innerHTML = `<div class="page-head"><h2>📝 الاختبارات</h2><span class="sp"></span>${canEditExams() ? '<a class="btn" href="#/exams/edit/new">➕ اختبار جديد</a>' : ''}</div>
-    <div class="tabs"><button data-k="" class="${!fk ? 'on' : ''}">الكل (${T('exams').length})</button>${Object.entries(EXAM_KINDS).map(([k, t]) => `<button data-k="${k}" class="${fk === k ? 'on' : ''}">${EXAM_KIND_ICON[k]} ${t.replace('اختبار ', '')}</button>`).join('')}</div>
+    <div class="tabs"><button data-k="" class="${!fk ? 'on' : ''}">الكل (${mine.length})</button>${Object.entries(EXAM_KINDS).map(([k, t]) => `<button data-k="${k}" class="${fk === k ? 'on' : ''}">${EXAM_KIND_ICON[k]} ${t.replace('اختبار ', '')}</button>`).join('')}</div>
     ${list.length ? `<div class="grid g2">${list.map(e => { examTotals(e); const studs = examStudents(e); const done = studs.filter(s => resTotals(e, getRes(e.id, s.id)).pct != null).length; const avg = studs.map(s => resTotals(e, getRes(e.id, s.id)).pct).filter(x => x != null); const av = avg.length ? avg.reduce((a, b) => a + b, 0) / avg.length : null; return `<div class="card exam-card">
       <div class="row"><span style="font-size:30px">${EXAM_KIND_ICON[e.kind] || '📝'}</span><div style="flex:1"><b style="font-size:16px">${esc(e.title)}</b><div class="small muted">${EXAM_KINDS[e.kind] || ''} · ${fmtDate(e.date)}</div></div>${av != null ? `<div class="ring-sm" style="--p:${av};--c:${gradeColor(av)}"><b>${Math.round(av)}%</b></div>` : ''}</div>
       <div class="row small" style="margin:8px 0">${(e.subjects || []).map(s => `<span class="chip">${s.icon} ${esc(s.name)} <b>${toAr(s.total)}</b></span>`).join('')}<span class="chip gold">المجموع ${toAr(e.total)}</span></div>

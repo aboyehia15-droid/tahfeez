@@ -237,6 +237,7 @@ function route_(r) {
       data.students = data.students.filter(function (s) { return my.indexOf(s.classId) >= 0; });
       data.records = data.records.filter(function (x) { return my.indexOf(x.classId) >= 0; });
       data.results = data.results.filter(function (x) { return my.indexOf(x.classId) >= 0; });
+      data.exams = data.exams.filter(function (e) { return (e.classIds || []).some(function (c) { return my.indexOf(c) >= 0; }); });
       data.payments = []; data.invites = [];
       data.users = data.users.map(function (u) { return { id: u.id, name: u.name, role: u.role }; });
       data.settings = data.settings.map(function (x) { var c = {}; for (var k in x) if (k !== 'waToken' && k !== 'waInstance') c[k] = x[k]; return c; });
