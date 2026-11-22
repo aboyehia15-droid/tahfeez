@@ -177,8 +177,15 @@ function route_(r) {
   }
 
   if (a === 'login') {
-    var u = readAll_('users').filter(function (x) { return String(x.username).trim() === String(r.username).trim() && x.active !== false; })[0];
-    if (!u || u.passHash !== hash_(r.password)) return { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' };
+    // يقبل الأرقام العربية (٠١٢) والفارسية، والمسافات، والأحرف الكبيرة والصغيرة، ورقم الجوال بصيغة 966 أو +966
+    var nd = function (v) { return String(v == null ? '' : v).replace(/[٠-٩]/g, function (d) { return d.charCodeAt(0) - 1632; }).replace(/[۰-۹]/g, function (d) { return d.charCodeAt(0) - 1776; }).replace(/\s+/g, '').toLowerCase(); };
+    var nu = function (v) { v = nd(v); if (/^\+?9665\d{8}$/.test(v)) v = '0' + v.replace(/^\+?966/, ''); if (/^5\d{8}$/.test(v)) v = '0' + v; return v; };
+    var want = nu(r.username);
+    var users = readAll_('users').filter(function (x) { return x.active !== false && x.username; });
+    var u = users.filter(function (x) { return nu(x.username) === want; })[0];
+    if (!u) return { ok: false, error: 'اسم المستخدم غير موجود — تأكد منه أو اطلبه من الإدارة' };
+    var pw = String(r.password == null ? '' : r.password);
+    if (u.passHash !== hash_(pw) && u.passHash !== hash_(nd(pw)) && u.passHash !== hash_(pw.trim())) return { ok: false, error: 'كلمة المرور غير صحيحة' };
     var t = Utilities.getUuid();
     PropertiesService.getScriptProperties().setProperty('S_' + t, u.id);
     return { ok: true, token: t, user: stripSecrets_([u])[0] };
