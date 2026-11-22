@@ -75,8 +75,8 @@ function viewDaily(v, sub) {
     if (ab) { const r = getRec(s.id, DAY.date) || newRec(s); r.att = r.att === ab.dataset.att ? '' : ab.dataset.att; save('records', r); render(); return; }
     if (e.target.closest('[data-open]')) recordEditor(s, DAY.date);
   };
-  $('#absWa').onclick = () => waQueueDialog(list.filter(s => (getRec(s.id, DAY.date) || {}).att === 'a').map(s => ({ name: s.name, phone: s.guardianPhone, text: fillTpl(S.settings.waAbsent, { student: s.name, date: fmtDate(DAY.date) }) })), 'إشعار غياب');
-  $('#dailyWa').onclick = () => waQueueDialog(list.map(s => ({ s, r: getRec(s.id, DAY.date) })).filter(x => x.r && x.r.att !== 'a').map(({ s, r }) => { if (!s.parentToken) { s.parentToken = token20(); save('students', s); } return { name: s.name, phone: s.guardianPhone, text: fillTpl(S.settings.waDaily, { student: s.name, date: fmtDate(DAY.date), summary: dailySummaryText(r), link: parentLink(s) }) }; }), 'تقارير اليوم لأولياء الأمور');
+  $('#absWa').onclick = () => waCompose('absent', list.filter(s => (getRec(s.id, DAY.date) || {}).att === 'a'), { date: DAY.date });
+  $('#dailyWa').onclick = () => waCompose('daily', list.filter(s => { const r = getRec(s.id, DAY.date); return r && r.att && r.att !== 'a'; }), { date: DAY.date }, '📤 تقارير يوم ' + fmtDate(DAY.date));
 }
 function newRec(s, date) { return { id: recId(s.id, date || DAY.date), studentId: s.id, classId: s.classId, date: date || DAY.date }; }
 
@@ -236,6 +236,6 @@ function recordEditor(s, date) {
   };
   $('[data-save]', m.el).onclick = () => { doSave(); m.close(); render(); };
   const nx = $('[data-next]', m.el); if (nx) nx.onclick = () => { doSave(); m.close(); render(); recordEditor(next, date); };
-  $('[data-wa]', m.el).onclick = () => { doSave(); if (!s.parentToken) { s.parentToken = token20(); save('students', s); } window.open(waLink(s.guardianPhone, r.att === 'a' ? fillTpl(S.settings.waAbsent, { student: s.name, date: fmtDate(date) }) : fillTpl(S.settings.waDaily, { student: s.name, date: fmtDate(date), summary: dailySummaryText(r), link: parentLink(s) })), '_blank'); };
+  $('[data-wa]', m.el).onclick = () => { doSave(); waCompose(r.att === 'a' ? 'absent' : 'daily', [s], { date }); };
   const dl = $('[data-del]', m.el); if (dl) dl.onclick = async () => { if (await confirmBox('حذف تسجيل هذا اليوم للطالب؟')) { remove('records', r.id); m.close(); render(); } };
 }

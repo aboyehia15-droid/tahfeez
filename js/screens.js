@@ -189,7 +189,7 @@ function studentMenu(st) {
     if (a === 'edit') { m.close(); studentForm(st); }
     if (a === 'page') window.open(parentLink(st), '_blank');
     if (a === 'copy') copyText(parentLink(st));
-    if (a === 'wa') { window.open(waLink(st.guardianPhone, fillTpl(S.settings.waParent, { student: st.name, link: parentLink(st) })), '_blank'); st.linkSentAt = Date.now(); save('students', st); }
+    if (a === 'wa') { m.close(); waCompose('parent', [st]); }
     if (a === 'report') { m.close(); location.hash = '#/reports/student/' + st.id; }
     if (a === 'activate') { m.close(); activateDialog([st]); }
     if (a === 'archive') { st.status = 'archived'; save('students', st); m.close(); render(); }
@@ -206,7 +206,7 @@ function activateDialog(list) {
     const cid = $('#act-cls').value; const sendWa = $('#act-wa').checked;
     list.forEach(st => { st.status = 'active'; if (cid) st.classId = cid; if (!st.parentToken) st.parentToken = token20(); st.activatedAt = Date.now(); save('students', st); });
     m.close(); toast('✔️ تم تفعيل ' + list.length);
-    if (sendWa) waQueueDialog(list.map(st => ({ name: st.name, phone: st.guardianPhone, text: fillTpl(S.settings.waParent, { student: st.name, link: parentLink(st) }), onSent: () => { st.linkSentAt = Date.now(); save('students', st); } })), 'إرسال روابط المتابعة');
+    if (sendWa) waCompose('parent', list);
     render();
   };
 }
@@ -253,7 +253,7 @@ function viewStudents(v, sub) {
   $('#stu-list').onclick = e => { const b = e.target.closest('[data-act]'); const it = e.target.closest('.list-item'); if (!it) return; const st = byId('students', it.dataset.id); if (b && b.dataset.act === 'activate') activateDialog([st]); else if (b || !e.target.classList.contains('sel')) studentMenu(st); };
   const ba = $('#bulk-act'); if (ba) ba.onclick = () => { const s = selected(); if (!s.length) return toast('حدد طلاباً أولاً'); activateDialog(s); };
   const bc = $('#bulk-cls'); if (bc) bc.onclick = () => { const s = selected(); if (!s.length) return toast('حدد طلاباً أولاً'); const m = modal({ title: 'نقل ' + s.length + ' طالب إلى فصل', body: `<select class="inp" id="mv">${classOptions('')}</select>`, foot: '<button class="btn" data-ok>نقل</button>' }); $('[data-ok]', m.el).onclick = () => { s.forEach(x => { x.classId = $('#mv').value; save('students', x); }); m.close(); render(); }; };
-  $('#bulk-wa').onclick = () => { let s = selected(); if (!s.length) s = T('students').filter(x => x.status === tab); waQueueDialog(s.map(st => { if (!st.parentToken) { st.parentToken = token20(); save('students', st); } return { name: st.name, phone: st.guardianPhone, text: fillTpl(S.settings.waParent, { student: st.name, link: parentLink(st) }), onSent: () => { st.linkSentAt = Date.now(); save('students', st); } }; }), 'إرسال روابط متابعة الطلاب لأولياء الأمور'); };
+  $('#bulk-wa').onclick = () => { let s = selected(); if (!s.length) s = T('students').filter(x => x.status === tab); waCompose('parent', s); };
   const ad = $('#add-stu'); if (ad) ad.onclick = () => studentForm();
   const im = $('#imp-stu'); if (im) im.onclick = importStudentsDialog;
   const ex = $('#exp-stu'); if (ex) ex.onclick = async () => { await loadXLSX(); const rows = T('students').map(s => { const o = {}; STU_FIELDS.forEach(f => o[f[1]] = s[f[0]] || ''); o['العمر'] = ageFrom(s.birthDate); o['الفصل'] = (classOf(s) || {}).name || ''; o['الحالة'] = { active: 'نشط', pending: 'بانتظار التفعيل', archived: 'مؤرشف' }[s.status] || ''; o['رابط ولي الأمر'] = s.parentToken ? parentLink(s) : ''; return o; }); const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.utils.book_append_sheet(wb, ws, 'بيانات الطلاب'); XLSX.writeFile(wb, 'بيانات الطلاب.xlsx'); };
@@ -508,7 +508,7 @@ function viewFees(v) {
   ['#fq', '#fc', '#fs'].forEach(s => $(s).addEventListener('input', draw));
   $('#ft').onclick = e => { const b = e.target.closest('[data-pay]'); if (b) paymentDialog(byId('students', b.dataset.pay), draw); const d = e.target.closest('[data-disc]'); if (d) discountDialog(byId('students', d.dataset.disc), draw); };
   $('#setfee').onclick = feesSettingsDialog;
-  $('#remind').onclick = () => waQueueDialog(rows().filter(x => x.r > 0).map(x => ({ name: x.st.name, phone: x.st.guardianPhone, text: fillTpl(S.settings.waFee, { student: x.st.name, remaining: num(x.r), link: parentLink(x.st) }) })), 'تذكير بالرسوم');
+  $('#remind').onclick = () => waCompose('fee', rows().filter(x => x.r > 0).map(x => x.st));
   $('#fexp').onclick = async () => { await loadXLSX(); const ws = XLSX.utils.json_to_sheet(rows().map((x, i) => ({ 'م': i + 1, 'الطالب': x.st.name, 'الفصل': (classOf(x.st) || {}).name || '', 'الرسوم': x.d.base, 'خصم الأخوة': x.d.sib, 'خصم خاص': x.d.spec, 'إعفاء': x.d.exempt, 'الصافي': x.f, 'المسدد': x.p, 'المتبقي': x.r }))); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الرسوم'); XLSX.writeFile(wb, 'الرسوم.xlsx'); };
 }
 function fileToDataURL(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); }); }
