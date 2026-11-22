@@ -88,8 +88,8 @@ function studentReport(s, from, to, periodLbl, subs) {
     if (done.length) h += `<div class="small" style="margin-top:6px"><b>السور المحفوظة حتى الآن (${num(pagesOfSet(memo))} وجه):</b> ${done.map(([p, i]) => Q.names[i] + (p < 1 ? ' (' + Math.round(p * 100) + '%)' : ' ✓')).join('، ')}</div>`;
   }
   if (subs.noor && f.noor) {
-    const nr = rs.filter(r => r.noor && r.noor.lesson);
-    h += `<div class="rep-sec">🔤 القاعدة النورانية</div>` + (nr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>الدرس</th><th>من بند</th><th>إلى بند</th><th>التقدير</th><th>أخطاء</th></tr>${nr.map(r => `<tr><td>${fmtDate(r.date)}</td><td class="r">${esc(NOORANIA[r.noor.lesson - 1].title)}</td><td>${r.noor.from || ''}${r.noor.from ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.from - 1] || '') + '»' : ''}</td><td>${r.noor.to || ''}${r.noor.to ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.to - 1] || '') + '»' : ''}</td><td>${gradeLabel(r.noor.grade)}</td><td>${(r.errors || []).filter(e => e.sub === 'noor').map(e => esc(e.word || '')).join('، ')}</td></tr>`).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
+    const nr = rs.filter(r => (r.noor && r.noor.lesson) || r.noorRev);
+    h += `<div class="rep-sec">🔤 القاعدة النورانية</div>` + (nr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>الدرس</th><th>من بند</th><th>إلى بند</th><th>التقدير</th><th>أخطاء</th><th>مراجعة الدروس</th></tr>${nr.map(r => !r.noor ? `<tr><td>${fmtDate(r.date)}</td><td colspan="5"></td><td class="r small">${esc(noorRevText(r.noorRev))} ${gradeLabel(r.noorRev.grade)}</td></tr>` : `<tr><td>${fmtDate(r.date)}</td><td class="r">${noorSegs(r.noor).map(g => esc(NOORANIA[g.lesson - 1].title)).join('<br>')}</td><td>${r.noor.from || ''}${r.noor.from ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.from - 1] || '') + '»' : ''}</td><td>${r.noor.to || ''}${r.noor.to ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.to - 1] || '') + '»' : ''}</td><td>${gradeLabel(r.noor.grade)}</td><td>${(r.errors || []).filter(e => e.sub === 'noor').map(e => esc(e.word || '')).join('، ')}</td><td class="r small">${r.noorRev ? esc(noorRevText(r.noorRev)) + ' ' + gradeLabel(r.noorRev.grade) : ''}</td></tr>`).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
   }
   classSubjects(c).filter(isCur).filter(cid => subs['c_' + cid] !== 0).forEach(cid => { h += curStudentSection(s, cid, rs); });
   if (subs.zad && f.zad) {
@@ -124,7 +124,9 @@ function weekReport(cid, ws, blank) {
     if (hasSeg(r.review)) L.push(`<b>م:</b> ${segText(r.review)} <small>(${gradeLabel(r.review.grade)})</small>`);
     if (hasSeg(r.far)) L.push(`<b>ب:</b> ${segText(r.far)} <small>(${gradeLabel(r.far.grade)})</small>`);
     Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (c && x && x.lesson) L.push(`${c.icon} ${esc(curShort(c.lessons[x.lesson - 1].t))} <small>(${gradeLabel(x.grade)})</small>`); });
-    if (r.noor && r.noor.lesson) L.push(`<b>ن:</b> د${r.noor.lesson} ${r.noor.from ? r.noor.from + '–' + r.noor.to : ''} <small>(${gradeLabel(r.noor.grade)})</small>`);
+    if (r.noor && r.noor.lesson) L.push(`<b>ن:</b> ${noorText(r.noor)} <small>(${gradeLabel(r.noor.grade)})</small>`);
+    if (r.noorRev) L.push(`<b>مر ن:</b> ${(r.noorRev.lessons || []).map(n => 'د' + n).join('، ')}`);
+    Object.keys(r.curRev || {}).forEach(cid => { const c = curById(cid); if (c) L.push(`<b>مر ${c.icon}:</b> ${esc(curRevText(cid, r.curRev[cid]))}`); });
     if (r.zad && r.zad.length) L.push(`<b>ز:</b> ${r.zad.map(z => esc(z.item)).join('، ')}`);
     if (r.att === 'l') L.push('<small>متأخر</small>');
     return L.join('<br>');

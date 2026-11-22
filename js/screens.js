@@ -50,7 +50,10 @@ function statsOf(sid, from, to) {
     if (r.review && r.review.s1) { o.review += +r.review.pages || 0; if (r.review.grade) { o.gsum += r.review.grade; o.gcnt++; } }
     if (r.far && r.far.s1) { o.far += +r.far.pages || 0; if (r.far.grade) { o.gsum += r.far.grade; o.gcnt++; } }
     Object.values(r.cur || {}).forEach(x => { if (x && x.lesson) { o.cur++; o.curItems += (x.items || []).length; if (x.grade) { o.gsum += x.grade; o.gcnt++; } } });
-    if (r.noor && r.noor.lesson) { o.noor++; o.noorItems += Math.abs((r.noor.to || 0) - (r.noor.from || 0)) + 1; if (r.noor.grade) { o.gsum += r.noor.grade; o.gcnt++; } }
+    if (r.noorRev) o.lessonRev = (o.lessonRev || 0) + (r.noorRev.lessons || []).length;
+    if (r.zadRev) o.lessonRev = (o.lessonRev || 0) + (r.zadRev.items || []).length;
+    Object.values(r.curRev || {}).forEach(v => o.lessonRev = (o.lessonRev || 0) + (v.lessons || []).length);
+    if (r.noor && r.noor.lesson) { o.noor++; o.noorItems += noorSegs(r.noor).reduce((a, g) => a + Math.abs((g.to || 0) - (g.from || 0)) + 1, 0) - (Math.abs((r.noor.to || 0) - (r.noor.from || 0)) + 1); if (r.noor.grade) { o.gsum += r.noor.grade; o.gcnt++; } }
     (r.zad || []).forEach(z => { if (z.item) { o.zad++; if (z.grade) { o.gsum += z.grade; o.gcnt++; } } });
     if (r.behavior) { o.beh += r.behavior; o.behN++; }
     (r.errors || []).forEach(e => { o.errors++; if (e.fixed) o.fixed++; });
@@ -61,7 +64,7 @@ function statsOf(sid, from, to) {
   o.total = o.hifz + o.review + o.far;
   o.gavg = o.gcnt ? o.gsum / o.gcnt : 0;
   o.attPct = o.days ? Math.round((o.p + o.l) / o.days * 100) : 0;
-  o.points = Math.round(o.hifz * 10 + o.review * 3 + o.far * 2 + o.curItems * .5 + o.gsum * 2 + (o.p + o.l * .5) * 2 + o.noorItems * .2 + o.zad * 3 + o.beh);
+  o.points = Math.round(o.hifz * 10 + o.review * 3 + o.far * 2 + o.curItems * .5 + (o.lessonRev || 0) * .5 + o.gsum * 2 + (o.p + o.l * .5) * 2 + o.noorItems * .2 + o.zad * 3 + o.beh);
   return o;
 }
 function levelOf(o) { const g = o.gavg; if (!o.gcnt) return '—'; return g >= 4.5 ? '🏅 متميز' : g >= 3.8 ? '🌟 ممتاز' : g >= 3 ? '👍 جيد جداً' : g >= 2.3 ? '🙂 جيد' : '📌 يحتاج متابعة'; }

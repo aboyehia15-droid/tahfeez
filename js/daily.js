@@ -15,7 +15,10 @@ function recSummary(r, subj) {
   if (subj.includes('quran') && hasSeg(r.review)) out.push(`<span class="chip blue">🔁 ${segText(r.review)} · ${num(r.review.pages)}و</span>${gradeChip(r.review.grade)}`);
   if (subj.includes('quran') && hasSeg(r.far)) out.push(`<span class="chip" style="background:#efe7fb;color:#5b3fb0">🕰️ ${segText(r.far)} · ${num(r.far.pages)}و</span>${gradeChip(r.far.grade)}`);
   subj.filter(isCur).forEach(cid => { const x = (r.cur || {})[cid]; if (x && x.lesson) out.push(curChip(cid, x)); });
-  if (subj.includes('noor') && r.noor && r.noor.lesson) out.push(`<span class="chip gold">🔤 د${r.noor.lesson}${r.noor.from ? ' (' + r.noor.from + '–' + r.noor.to + ')' : ''}</span>${gradeChip(r.noor.grade)}`);
+  if (subj.includes('noor') && r.noor && r.noor.lesson) out.push(`<span class="chip gold">🔤 ${noorText(r.noor)}</span>${gradeChip(r.noor.grade)}`);
+  if (subj.includes('noor') && r.noorRev) out.push(`<span class="chip gold">🔁🔤 مراجعة ${(r.noorRev.lessons || []).length} درس</span>${gradeChip(r.noorRev.grade)}`);
+  if (subj.includes('zad') && r.zadRev) out.push(`<span class="chip" style="background:#fbe7ee;color:#a3325a">🔁🌸 مراجعة ${(r.zadRev.items || []).length}</span>`);
+  Object.keys(r.curRev || {}).forEach(cid => { const c = curById(cid); if (c && subj.includes(cid)) out.push(`<span class="chip" style="background:${c.color}22;color:${c.color}">🔁${c.icon} مراجعة ${(r.curRev[cid].lessons || []).length}</span>`); });
   if (subj.includes('zad') && r.zad && r.zad.length) out.push(`<span class="chip" style="background:#fbe7ee;color:#a3325a">🌸 ${r.zad.length} من زاد الطفل</span>`);
   if (r.errors && r.errors.length) out.push(`<span class="chip red">✏️ ${r.errors.filter(e => !e.fixed).length}/${r.errors.length} خطأ</span>`);
   if (r.behavior) out.push(stars(r.behavior));
@@ -31,7 +34,10 @@ function dailySummaryText(r) {
   if (hasSeg(r.review)) L.push('🔁 المراجعة: ' + segText(r.review) + (r.review.grade ? ' — ' + gradeLabel(r.review.grade) : ''));
   if (hasSeg(r.far)) L.push('🕰️ المراجعة البعيدة: ' + segText(r.far) + (r.far.grade ? ' — ' + gradeLabel(r.far.grade) : ''));
   Object.keys(r.cur || {}).forEach(cid => { const t = curLine(cid, r.cur[cid]); if (t) L.push(t); });
-  if (r.noor && r.noor.lesson) L.push('🔤 النورانية: ' + NOORANIA[r.noor.lesson - 1].title + (r.noor.grade ? ' — ' + gradeLabel(r.noor.grade) : ''));
+  if (r.noor && r.noor.lesson) L.push('🔤 النورانية: ' + noorText(r.noor, true) + (r.noor.grade ? ' — ' + gradeLabel(r.noor.grade) : ''));
+  if (r.noorRev) L.push('🔁 مراجعة النورانية: ' + noorRevText(r.noorRev) + (r.noorRev.grade ? ' — ' + gradeLabel(r.noorRev.grade) : ''));
+  if (r.zadRev) L.push('🔁 مراجعة زاد الطفل: ' + zadRevText(r.zadRev) + (r.zadRev.grade ? ' — ' + gradeLabel(r.zadRev.grade) : ''));
+  Object.keys(r.curRev || {}).forEach(cid => { const c = curById(cid); if (c) L.push('🔁 مراجعة ' + c.name + ': ' + curRevText(cid, r.curRev[cid]) + (r.curRev[cid].grade ? ' — ' + gradeLabel(r.curRev[cid].grade) : '')); });
   (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat); L.push('🌸 ' + (c ? c.name : '') + ': ' + z.item + (z.grade ? ' — ' + gradeLabel(z.grade) : '')); });
   const errs = (r.errors || []).filter(e => !e.fixed); if (errs.length) L.push('✏️ أخطاء تحتاج مراجعة: ' + errs.length);
   if (r.note) L.push('📝 ' + r.note);
@@ -85,7 +91,7 @@ function recordEditor(s, date) {
   const c = classOf(s); const subj = classSubjects(c); const f = features();
   const orig = getRec(s.id, date);
   const r = JSON.parse(JSON.stringify(orig || newRec(s, date)));
-  r.classId = s.classId; r.errors = r.errors || []; r.zad = r.zad || []; r.cur = r.cur || {}; r.media = r.media || [];
+  r.classId = s.classId; r.errors = r.errors || []; r.zad = r.zad || []; r.cur = r.cur || {}; r.media = r.media || []; r.curRev = r.curRev || {};
   if (!r.att) r.att = 'p';
   const body = document.createElement('div');
   const list = studentsOfClass(s.classId); const idx = list.findIndex(x => x.id === s.id); const next = list[idx + 1];
@@ -114,12 +120,16 @@ function recordEditor(s, date) {
       const ln = lastRec(s.id, date, 'noor'); r.noor = r.noor || {};
       h += sec('noor', '🔤 القاعدة النورانية', `${ln ? `<div class="small muted" style="margin-bottom:6px">آخر تسجيل: <b>الدرس ${ln.noor.lesson}</b> ${ln.noor.from ? '(' + ln.noor.from + '–' + ln.noor.to + ')' : ''} ${gradeChip(ln.noor.grade)}${!r.noor.lesson ? ` <button class="btn sm gold" data-sug="noor">↩️ متابعة</button>` : ''}</div>` : ''}
         <select class="inp" id="nles"><option value="">— اختر الدرس —</option>${NOORANIA.map((l, i) => `<option value="${i + 1}" ${r.noor.lesson == i + 1 ? 'selected' : ''}>${i + 1}. ${esc(l.title.replace(/^الدرس\s*\S+\s*-?\s*/, ''))}</option>`).join('')}</select>
-        <div class="voice-text" data-vt="noor" hidden></div><div id="nitems" style="margin-top:8px"></div><div style="margin-top:8px">${gradeButtons(r.noor.grade, 'noor')}</div>`, true);
+        <div class="voice-text" data-vt="noor" hidden></div><div id="nitems" style="margin-top:8px"></div>${noorExtrasHTML(r.noor)}<div style="margin-top:8px">${gradeButtons(r.noor.grade, 'noor')}</div>`, true);
+      r.noorRev = r.noorRev || { lessons: [] };
+      h += sec('noorRev', '🔁 مراجعة دروس النورانية', `<div class="small muted" style="margin-bottom:6px">اختر الدروس التي راجعها الطالب اليوم</div><div data-mrev="noor"></div><div style="margin-top:8px">${gradeButtons(r.noorRev.grade, 'noorRev')}</div>`);
     }
     if (subj.includes('zad')) {
       h += sec('zad', '🌸 زاد الطفل المسلم', zadCurriculum().map(cat => { const cur = r.zad.filter(z => z.cat === cat.id); return `<div class="zad-cat"><div class="t"><span>${cat.icon}</span>${esc(cat.name)}<span style="flex:1"></span><select class="inp" data-zadd="${cat.id}" style="width:auto;max-width:60%;font-size:13px"><option value="">➕ إضافة بند…</option>${cat.items.map(it => `<option>${esc(it)}</option>`).join('')}</select></div>${cur.map(z => `<div class="row" style="margin:4px 0"><span style="flex:1;min-width:120px">• ${esc(z.item)}</span>${gradeButtons(z.grade, 'zad|' + cat.id + '|' + z.item).replace('class="grades"', 'class="grades" style="flex:2"')}<button class="btn sm ghost" data-zdel="${cat.id}|${esc(z.item)}">✕</button></div>`).join('')}</div>`; }).join(''));
+      r.zadRev = r.zadRev || { items: [] };
+      h += sec('zadRev', '🔁 مراجعة زاد الطفل', `<div class="small muted" style="margin-bottom:6px">اختر ما راجعه الطالب من الآداب والأذكار والأحاديث…</div><div data-mrev="zad"></div><div style="margin-top:8px">${gradeButtons(r.zadRev.grade, 'zadRev')}</div>`);
     }
-    window.DAILY_MEDIA = r.media; subj.filter(isCur).forEach(cid => { h += curEditorHTML(cid, r.cur[cid], s.id, date); });
+    window.DAILY_MEDIA = r.media; window.DAILY_REV = r.curRev; subj.filter(isCur).forEach(cid => { h += curEditorHTML(cid, r.cur[cid], s.id, date); });
     h += sec('errs', '✏️ الأخطاء والتصويب', `<div class="small muted" style="margin-bottom:6px">${subj.includes('quran') ? 'في جزء عم: اضغط على الكلمة الخاطئة في نص الآيات أعلاه لتسجيلها. ' : ''}أو أضف الخطأ يدوياً:</div><div class="err-list" id="elist"></div><button class="btn sm light" id="eadd">➕ إضافة خطأ</button>`);
     h += `<div class="sec"><div class="sec-h">🎙️ تسجيل عام<span class="sp"></span>${recButtons('')}</div><div id="emedia">${mediaListHTML(r.media, true, '') || '<div class="small muted">لكل مادة زرّا 🎙️ و🎥 في رأسها لتسجيل تسميعها، وهنا تسجيل عام لليوم. اختر «إرسال لولي الأمر» ليظهر في صفحة ابنه تحت المادة.</div>'}</div></div>`;
     h += sec('note', '📝 ملاحظات المعلم', `${f.behavior ? `<div class="row" style="margin-bottom:8px"><span>السلوك والانضباط:</span><span id="beh">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-b="${n}" style="border:0;background:none;font-size:26px;cursor:pointer;color:${(r.behavior || 0) >= n ? '#e2b93b' : '#ddd'}">★</button>`).join('')}</span></div>` : ''}<textarea class="inp" id="enote" placeholder="ملاحظة تظهر لولي الأمر في صفحة الطالب">${esc(r.note || '')}</textarea>
@@ -134,7 +144,14 @@ function recordEditor(s, date) {
       const ex = document.createElement('div'); ex.dataset.extra = k; host.after(ex); drawExtras(k); drawAyahs(k);
     });
     drawNoor(); drawErrs();
+    const mR = (key, groups, cur, onCh) => { const hh = $(`[data-mrev="${key}"]`, eb); if (hh) hh.appendChild(multiDrop(groups, cur, 'الدروس', onCh)); };
+    if (r.noorRev) mR('noor', [{ name: '', items: NOORANIA.map((l, i) => ({ key: String(i + 1), t: (i + 1) + '. ' + l.title.replace(/^الدرس\s*\S+\s*-?\s*/, '') })) }], (r.noorRev.lessons || []).map(String), k => r.noorRev.lessons = k.map(Number));
+    if (r.zadRev) mR('zad', zadCurriculum().map(c => ({ name: c.icon + ' ' + c.name, items: c.items.map(it => ({ key: c.id + '|' + it, t: it })) })), r.zadRev.items || [], k => r.zadRev.items = k);
+    subj.filter(isCur).forEach(cid => { r.curRev[cid] = r.curRev[cid] || { lessons: [] }; mR(cid, [{ name: '', items: curById(cid).lessons.map((l, i) => ({ key: String(i + 1), t: (i + 1) + '. ' + l.t })) }], (r.curRev[cid].lessons || []).map(String), k => r.curRev[cid].lessons = k.map(Number)); });
     bindGrades(eb, (name, g) => {
+      if (name === 'noorRev') { r.noorRev.grade = g; return; }
+      if (name === 'zadRev') { r.zadRev.grade = g; return; }
+      if (name.startsWith('crev|')) { const cid = name.slice(5); r.curRev[cid] = r.curRev[cid] || { lessons: [] }; r.curRev[cid].grade = g; return; }
       if (name === 'hifz' || name === 'review' || name === 'far') { r[name] = r[name] || {}; r[name].grade = g; }
       else if (name.startsWith('cur|')) { const cid = name.slice(4); r.cur[cid] = r.cur[cid] || {}; r.cur[cid].grade = g; }
       else if (name === 'noor') r.noor.grade = g;
@@ -197,6 +214,10 @@ function recordEditor(s, date) {
   $('#eatt', body).onclick = e => { const b = e.target.closest('[data-att]'); if (!b) return; r.att = b.dataset.att; $$('#eatt button', body).forEach(x => x.classList.toggle('on', x === b)); drawBody(); };
   eb.addEventListener('change', e => {
     const t = e.target;
+    if (t.dataset.nxl != null) { const e = r.noor.extra[+t.dataset.nxl]; e.lesson = +t.value || null; const L = e.lesson ? NOORANIA[e.lesson - 1] : null; e.from = L ? 1 : null; e.to = L ? L.items.length : null; drawBody(); return; }
+    if (t.dataset.nxf != null) { r.noor.extra[+t.dataset.nxf].from = +t.value; return; }
+    if (t.dataset.nxt != null) { r.noor.extra[+t.dataset.nxt].to = +t.value; return; }
+    if (t.dataset.cxl) { const [cid, i] = t.dataset.cxl.split('|'); const e = r.cur[cid].extra[+i]; e.lesson = +t.value || null; e.items = e.lesson ? curById(cid).lessons[e.lesson - 1].items.map((_, j) => j) : []; drawBody(); return; }
     if (t.id === 'nles') { r.noor = { lesson: +t.value || null, grade: r.noor.grade }; drawNoor(); }
     if (t.dataset.cles) { r.cur[t.dataset.cles] = { lesson: +t.value || null, items: [], errs: [], grade: (r.cur[t.dataset.cles] || {}).grade }; drawBody(); }
     if (t.dataset.zadd) { if (t.value && !r.zad.some(z => z.cat === t.dataset.zadd && z.item === t.value)) r.zad.push({ cat: t.dataset.zadd, item: t.value, grade: 0 }); drawBody(); }
@@ -231,6 +252,11 @@ function recordEditor(s, date) {
     }
     const rb = t.closest('[data-rec]'); if (rb) { const sub = rb.dataset.rsub || ''; const NM = { hifz: 'حفظ', review: 'مراجعة', far: 'مراجعة بعيدة', noor: 'النورانية', zad: 'زاد الطفل' }; const rngs = { hifz: r.hifz, review: r.review, far: r.far }; let what = NM[sub] || (curById(sub) ? curById(sub).name : 'تسميع'); if (hasSeg(rngs[sub])) what += ' ' + segText(rngs[sub]); if (sub === 'noor' && r.noor && r.noor.lesson) what += ' — الدرس ' + r.noor.lesson; if (curById(sub) && r.cur[sub] && r.cur[sub].lesson) what += ' — ' + curShort(curById(sub).lessons[r.cur[sub].lesson - 1].t); recordMedia(rb.dataset.rec, s.name.split(' ')[0] + ': ' + what + ' (' + fmtDate(date, false) + ')').then(x => { if (x) { x.sub = sub; r.media.push(x); save('records', Object.assign({}, r)); drawBody(); } }); return; }
     const msh = t.closest('[data-mshare]'), mdl = t.closest('[data-mdel]'); if (msh || mdl) { if (msh) r.media[+msh.dataset.mshare].share = !r.media[+msh.dataset.mshare].share; else r.media.splice(+mdl.dataset.mdel, 1); drawBody(); return; }
+    if (t.closest('[data-nxadd]')) { r.noor.extra = r.noor.extra || []; r.noor.extra.push({}); drawBody(); return; }
+    const nxr = t.closest('[data-nxr]'); if (nxr) { r.noor.extra.splice(+nxr.dataset.nxr, 1); drawBody(); return; }
+    const cxa = t.closest('[data-cxadd]'); if (cxa) { const x = r.cur[cxa.dataset.cxadd] = r.cur[cxa.dataset.cxadd] || {}; x.extra = x.extra || []; x.extra.push({ items: [] }); drawBody(); return; }
+    const cxr = t.closest('[data-cxr]'); if (cxr) { const [cid, i] = cxr.dataset.cxr.split('|'); r.cur[cid].extra.splice(+i, 1); drawBody(); return; }
+    const cxi = t.closest('[data-cxi]'); if (cxi) { const [cid, i, j] = cxi.dataset.cxi.split('|'); const e = r.cur[cid].extra[+i]; const jj = +j; e.items = e.items.includes(jj) ? e.items.filter(v => v !== jj) : e.items.concat([jj]); drawBody(); return; }
     const ms = t.closest('[data-msur]'); if (ms) { const [k, n] = ms.dataset.msur.split('|'); const sn = +n; $(`[data-rp="${k}"]`, eb)._rp.set({ s1: sn, a1: 1, s2: sn, a2: Q.count(sn) }); return; }
     const cs = t.closest('[data-csug]'); if (cs) { r.cur[cs.dataset.csug] = curSuggest(s.id, date, cs.dataset.csug); drawBody(); return; }
     const ca = t.closest('[data-call]'); if (ca) { const cid = ca.dataset.call; const x = r.cur[cid]; x.items = curById(cid).lessons[x.lesson - 1].items.map((_, i) => i); x.errs = []; drawBody(); return; }
@@ -246,8 +272,13 @@ function recordEditor(s, date) {
   });
   const doSave = () => {
     ['hifz', 'review', 'far'].forEach(k => { const x = r[k]; if (!x) return; x.extra = (x.extra || []).filter(g => g && g.s1); x.extra.forEach(g => { g.s2 = g.s2 || g.s1; g.pages = +Q.pagesBetween(g.s1, g.a1, g.s2, g.a2).toFixed(3); }); if (!x.s1 && x.extra.length) { const f0 = x.extra.shift(); Object.assign(x, { s1: f0.s1, a1: f0.a1, s2: f0.s2, a2: f0.a2 }); } if (!x.extra.length) delete x.extra; if (hasSeg(x)) { x.s2 = x.s2 || x.s1; x.pages = +segPages(x).toFixed(3); } else delete r[k]; });
+    if (r.noor) { r.noor.extra = (r.noor.extra || []).filter(e => e.lesson); if (!r.noor.lesson && r.noor.extra.length) Object.assign(r.noor, r.noor.extra.shift()); if (!r.noor.extra.length) delete r.noor.extra; }
     if (r.noor && !r.noor.lesson) delete r.noor; if (r.noor) delete r.noor._picked;
-    if (r.att === 'a' || r.att === 'e') { delete r.hifz; delete r.review; delete r.far; delete r.noor; r.zad = []; r.cur = {}; }
+    if (r.noorRev && !(r.noorRev.lessons || []).length) delete r.noorRev;
+    if (r.zadRev && !(r.zadRev.items || []).length) delete r.zadRev;
+    Object.keys(r.curRev || {}).forEach(k => { if (!(r.curRev[k].lessons || []).length) delete r.curRev[k]; }); if (r.curRev && !Object.keys(r.curRev).length) delete r.curRev;
+    Object.values(r.cur || {}).forEach(x => { if (x && x.extra) { x.extra = x.extra.filter(e => e.lesson); if (!x.lesson && x.extra.length) Object.assign(x, x.extra.shift()); if (!x.extra.length) delete x.extra; } });
+    if (r.att === 'a' || r.att === 'e') { delete r.hifz; delete r.review; delete r.far; delete r.noor; delete r.noorRev; delete r.zadRev; delete r.curRev; r.zad = []; r.cur = {}; }
     Object.keys(r.cur || {}).forEach(k => { if (!r.cur[k] || !r.cur[k].lesson) delete r.cur[k]; });
     save('records', r); toast('✔️ تم الحفظ');
   };
@@ -255,4 +286,13 @@ function recordEditor(s, date) {
   const nx = $('[data-next]', m.el); if (nx) nx.onclick = () => { doSave(); m.close(); render(); recordEditor(next, date); };
   $('[data-wa]', m.el).onclick = () => { doSave(); waCompose(r.att === 'a' ? 'absent' : 'daily', [s], { date }); };
   const dl = $('[data-del]', m.el); if (dl) dl.onclick = async () => { if (await confirmBox('حذف تسجيل هذا اليوم للطالب؟')) { remove('records', r.id); m.close(); render(); } };
+}
+
+/* ——— دروس إضافية للنورانية ——— */
+function noorExtrasHTML(n) {
+  const ex = (n && n.extra) || [];
+  return `<div style="margin-top:6px">${ex.map((e, i) => { const L = e.lesson ? NOORANIA[e.lesson - 1] : null; return `<div class="seg-box"><div class="row small"><b>➕ درس ${i + 2}</b><span style="flex:1"></span><button type="button" class="btn sm ghost" data-nxr="${i}">✕ حذف</button></div>
+    <select class="inp" data-nxl="${i}"><option value="">— اختر الدرس —</option>${NOORANIA.map((l, j) => `<option value="${j + 1}" ${e.lesson == j + 1 ? 'selected' : ''}>${j + 1}. ${esc(l.title.replace(/^الدرس\s*\S+\s*-?\s*/, ''))}</option>`).join('')}</select>
+    ${L ? `<div class="row" style="margin-top:6px"><span class="small">من</span><select class="inp" data-nxf="${i}" style="width:auto;font-family:var(--quran)">${L.items.map((it, j) => `<option value="${j + 1}" ${e.from == j + 1 ? 'selected' : ''}>${j + 1}. ${esc(it)}</option>`).join('')}</select><span class="small">إلى</span><select class="inp" data-nxt="${i}" style="width:auto;font-family:var(--quran)">${L.items.map((it, j) => `<option value="${j + 1}" ${e.to == j + 1 ? 'selected' : ''}>${j + 1}. ${esc(it)}</option>`).join('')}</select></div>` : ''}</div>`; }).join('')}
+    <button type="button" class="btn sm light" data-nxadd>➕ إضافة درس آخر</button></div>`;
 }

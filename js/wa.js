@@ -26,7 +26,10 @@ function waBuild(kind, s, ctx, o) {
     if (o.hifz && hasSeg(r.hifz)) L.push('📖 الحفظ: ' + segText(r.hifz) + g(r.hifz));
     if (o.review && hasSeg(r.review)) L.push('🔁 المراجعة: ' + segText(r.review) + g(r.review));
     if (o.far && hasSeg(r.far)) L.push('🕰️ المراجعة البعيدة: ' + segText(r.far) + g(r.far));
-    if (o.noor && r.noor && r.noor.lesson) L.push('🔤 النورانية: ' + NOORANIA[r.noor.lesson - 1].title + g(r.noor));
+    if (o.noor && r.noor && r.noor.lesson) L.push('🔤 النورانية: ' + noorText(r.noor, true) + g(r.noor));
+    if (o.noor && r.noorRev) L.push('🔁 مراجعة النورانية: ' + noorRevText(r.noorRev) + g(r.noorRev));
+    if (o.zad && r.zadRev) L.push('🔁 مراجعة زاد الطفل: ' + zadRevText(r.zadRev) + g(r.zadRev));
+    if (o.cur) Object.keys(r.curRev || {}).forEach(cid => { const c = curById(cid); if (c) L.push('🔁 مراجعة ' + c.name + ': ' + curRevText(cid, r.curRev[cid]) + g(r.curRev[cid])); });
     if (o.zad) (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat); L.push('🌸 ' + (c ? c.name : '') + ': ' + z.item + g(z)); });
     if (o.cur) Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (c && x && x.lesson) L.push(c.icon + ' ' + c.name + ': ' + c.lessons[x.lesson - 1].t + g(x)); });
     if (o.errors) { const e = (r.errors || []); if (e.length) L.push(`✏️ الأخطاء: ${e.length}${e.filter(x => x.fixed).length ? ' (صُوّب منها ' + e.filter(x => x.fixed).length + ')' : ''}` + (e.filter(x => !x.fixed && x.word).length ? ' — يحتاج مراجعة: ' + e.filter(x => !x.fixed && x.word).map(x => x.word).slice(0, 5).join('، ') : '')); }

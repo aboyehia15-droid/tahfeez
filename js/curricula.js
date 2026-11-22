@@ -9,6 +9,7 @@ function curProgress(sid, cid, recs) {
   const c = curById(cid); const map = {}; let last = null; const errs = {};
   (recs || allRecsOf(sid)).forEach(r => {
     const x = (r.cur || {})[cid]; if (!x || !x.lesson || r.att === 'a' || r.att === 'e') return;
+    (x.extra || []).filter(e => e.lesson).forEach(e => { map[e.lesson] = map[e.lesson] || new Set(); if (x.grade !== 1) (e.items || []).forEach(i => map[e.lesson].add(i)); });
     map[x.lesson] = map[x.lesson] || new Set();
     if (x.grade !== 1) (x.items || []).forEach(i => map[x.lesson].add(i));
     (x.errs || []).forEach(i => { errs[x.lesson + ':' + i] = 1; });
@@ -20,15 +21,16 @@ function curProgress(sid, cid, recs) {
   c.lessons.forEach((L, i) => { const s = map[i + 1]; const k = s ? Math.min(1, s.size / Math.max(1, L.items.length)) : 0; sum += k; if (k >= 1) done++; });
   return { map, last, done, pct: c.lessons.length ? sum / c.lessons.length : 0, errs: Object.keys(errs).map(k => { const [l, i] = k.split(':').map(Number); return { lesson: l, item: i, text: (c.lessons[l - 1] || {}).items ? c.lessons[l - 1].items[i] : '' }; }) };
 }
+const curSegs = x => x && x.lesson ? [x].concat((x.extra || []).filter(e => e.lesson)) : [];
 function curChip(cid, x) {
   const c = curById(cid); if (!c || !x || !x.lesson) return '';
-  const L = c.lessons[x.lesson - 1] || {};
-  return `<span class="chip" style="background:${c.color}22;color:${c.color}">${c.icon} ${esc(curShort(L.t))}${x.items && x.items.length ? ' (' + x.items.length + '/' + (L.items || []).length + ')' : ''}</span>${gradeChip(x.grade)}`;
+  return `<span class="chip" style="background:${c.color}22;color:${c.color}">${c.icon} ${curSegs(x).map(g => esc(curShort((c.lessons[g.lesson - 1] || {}).t))).join(' + ')}</span>${gradeChip(x.grade)}`;
 }
+function curRevText(cid, rv) { const c = curById(cid); if (!c || !rv || !(rv.lessons || []).length) return ''; return rv.lessons.map(n => curShort((c.lessons[n - 1] || {}).t)).join('، '); }
 function curLine(cid, x) {
   const c = curById(cid); if (!c || !x || !x.lesson) return '';
   const L = c.lessons[x.lesson - 1] || {};
-  return `${c.icon} ${c.name}: ${L.t || ''}${x.items && x.items.length ? ' — ' + x.items.map(i => L.items[i]).join('، ') : ''}${x.grade ? ' — ' + gradeLabel(x.grade) : ''}`;
+  return `${c.icon} ${c.name}: ${curSegs(x).map(g => (c.lessons[g.lesson - 1] || {}).t || '').join(' + ')}${x.grade ? ' — ' + gradeLabel(x.grade) : ''}`;
 }
 
 /* قسم المنهج في محرر التسجيل اليومي */
@@ -42,7 +44,12 @@ function curEditorHTML(cid, x, sid, date) {
     ${L ? `<div class="small muted" style="margin:8px 0 4px">اضغط على ما أتقنه الطالب ✔️ — وضاعف الضغط (أو فعّل وضع الأخطاء) على ما أخطأ فيه ✖️</div>
       <div class="row" style="margin-bottom:6px"><button type="button" class="btn sm ghost" data-call="${cid}">✔️ الكل</button><label class="row small"><input type="checkbox" data-cerr="${cid}"> وضع تحديد الأخطاء</label></div>
       <div class="noor-items">${L.items.map((it, i) => `<button type="button" data-citem="${cid}|${i}" class="${(x.errs || []).includes(i) ? 'err' : (x.items || []).includes(i) ? 'in' : ''}" style="font-family:Tajawal;font-size:14px">${(x.errs || []).includes(i) ? '✖️ ' : (x.items || []).includes(i) ? '✔️ ' : ''}${esc(it)}</button>`).join('')}</div>` : ''}
-    <div style="margin-top:8px">${gradeButtons(x.grade, 'cur|' + cid)}</div>${typeof DAILY_MEDIA !== 'undefined' && DAILY_MEDIA ? `<div data-mlist="${cid}">${mediaListHTML(DAILY_MEDIA, true, cid)}</div>` : ''}</div>`;
+    ${(x.extra || []).map((e, i) => { const EL = e.lesson ? c.lessons[e.lesson - 1] : null; return `<div class="seg-box"><div class="row small"><b>➕ درس ${i + 2}</b><span style="flex:1"></span><button type="button" class="btn sm ghost" data-cxr="${cid}|${i}">✕ حذف</button></div>
+      <select class="inp" data-cxl="${cid}|${i}"><option value="">— اختر الدرس —</option>${c.lessons.map((l, j) => `<option value="${j + 1}" ${e.lesson == j + 1 ? 'selected' : ''}>${j + 1}. ${esc(l.t)}</option>`).join('')}</select>
+      ${EL ? `<div class="noor-items" style="margin-top:6px">${EL.items.map((it, j) => `<button type="button" data-cxi="${cid}|${i}|${j}" class="${(e.items || []).includes(j) ? 'in' : ''}" style="font-family:Tajawal;font-size:13px">${(e.items || []).includes(j) ? '✔️ ' : ''}${esc(it)}</button>`).join('')}</div>` : ''}</div>`; }).join('')}
+    <div style="margin-top:6px"><button type="button" class="btn sm light" data-cxadd="${cid}">➕ إضافة درس آخر</button></div>
+    <div style="margin-top:8px">${gradeButtons(x.grade, 'cur|' + cid)}</div>
+    <div class="seg-box" style="background:#f6f9ff;border-color:#c9d6f0"><div class="small"><b>🔁 مراجعة دروس ${esc(c.name)}</b> <span class="muted">— اختر الدروس التي راجعها</span></div><div data-mrev="${cid}" style="margin-top:4px"></div><div style="margin-top:6px">${gradeButtons(((typeof DAILY_REV !== 'undefined' && DAILY_REV && DAILY_REV[cid]) || {}).grade, 'crev|' + cid)}</div></div>${typeof DAILY_MEDIA !== 'undefined' && DAILY_MEDIA ? `<div data-mlist="${cid}">${mediaListHTML(DAILY_MEDIA, true, cid)}</div>` : ''}</div>`;
 }
 function curSuggest(sid, date, cid) {
   const c = curById(cid); const pr = curProgress(sid, cid, allRecsOf(sid).filter(r => r.date < date));
@@ -67,9 +74,9 @@ function curReport(cid, curId, from, to, lbl) {
 
 /* ——— قسم المنهج في تقرير الطالب ——— */
 function curStudentSection(s, cid, rs) {
-  const c = curById(cid); const rows = rs.filter(r => r.cur && r.cur[cid] && r.cur[cid].lesson); const pr = curProgress(s.id, cid);
+  const c = curById(cid); const rows = rs.filter(r => (r.cur && r.cur[cid] && r.cur[cid].lesson) || (r.curRev && r.curRev[cid])); const pr = curProgress(s.id, cid);
   let h = `<div class="rep-sec">${c.icon} ${esc(c.name)} <span class="small muted">— مكتمل ${pr.done} من ${c.lessons.length} درساً (${Math.round(pr.pct * 100)}%)</span></div>`;
-  h += rows.length ? `<table class="tbl"><tr><th>التاريخ</th><th>الدرس</th><th>ما أتقنه</th><th>يحتاج متابعة</th><th>التقدير</th></tr>${rows.map(r => { const x = r.cur[cid]; const L = c.lessons[x.lesson - 1] || { items: [] }; return `<tr><td>${fmtDate(r.date)}</td><td class="r">${esc(L.t || '')}</td><td class="r small">${(x.items || []).map(i => esc(L.items[i])).join('، ')}</td><td class="r small" style="color:var(--red)">${(x.errs || []).map(i => esc(L.items[i])).join('، ')}</td><td>${gradeLabel(x.grade)}</td></tr>`; }).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات في هذه الفترة</div>';
+  h += rows.length ? `<table class="tbl"><tr><th>التاريخ</th><th>الدرس</th><th>ما أتقنه</th><th>يحتاج متابعة</th><th>التقدير</th><th>مراجعة الدروس</th></tr>${rows.map(r => { const x = (r.cur || {})[cid] || {}; const L = c.lessons[(x.lesson || 0) - 1] || { items: [] }; return `<tr><td>${fmtDate(r.date)}</td><td class="r">${curSegs(x).map(g => esc((c.lessons[g.lesson - 1] || {}).t || '')).join('<br>')}</td><td class="r small">${(x.items || []).map(i => esc(L.items[i])).join('، ')}</td><td class="r small" style="color:var(--red)">${(x.errs || []).map(i => esc(L.items[i])).join('، ')}</td><td>${gradeLabel(x.grade)}</td><td class="r small">${esc(curRevText(cid, (r.curRev || {})[cid]))}${(r.curRev || {})[cid] && r.curRev[cid].grade ? ' — ' + gradeLabel(r.curRev[cid].grade) : ''}</td></tr>`; }).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات في هذه الفترة</div>';
   return h;
 }
 
@@ -129,3 +136,9 @@ function autoEnableCurricula() {
   if (!S.data.classes.length) return;
   enableAllCurricula(true); saveSettings({ curAllOn: 1 }); render();
 }
+
+/* ——— نصوص دروس النورانية الإضافية والمراجعات ——— */
+const noorSegs = n => n && n.lesson ? [n].concat((n.extra || []).filter(e => e.lesson)) : [];
+function noorText(n, long) { return noorSegs(n).map(g => (long ? NOORANIA[g.lesson - 1].title : 'د' + g.lesson) + (g.from ? ' (' + g.from + '–' + g.to + ')' : '')).join(' + '); }
+function noorRevText(rv) { return rv && (rv.lessons || []).length ? rv.lessons.map(n => 'الدرس ' + n).join('، ') : ''; }
+function zadRevText(rv) { return rv && (rv.items || []).length ? rv.items.map(k => k.split('|').slice(1).join('|')).join('، ') : ''; }
