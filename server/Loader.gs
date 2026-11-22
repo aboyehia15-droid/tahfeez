@@ -5,7 +5,17 @@
 //  فكل تحديث يُرفع إلى GitHub يصل للبرنامج دون لصق أو نشر جديد.
 //  إن تعذّر الوصول إلى GitHub يعمل البرنامج بآخر نسخة سليمة محفوظة في جدول البيانات.
 // ============================================================
-const CORE_BASE = 'https://raw.githubusercontent.com/aboyehia15-droid/tahfeez/main/server/';
+const CORE_REPO = 'aboyehia15-droid/tahfeez';
+const CORE_BASE = 'https://raw.githubusercontent.com/' + CORE_REPO + '/main/server/';
+// رقم آخر تعديل على GitHub: الجلب به يعطي أحدث نسخة فوراً (الرابط العادي قد يُخزَّن عند GitHub بضع دقائق)
+function coreUrl_(name) {
+  try {
+    const r = UrlFetchApp.fetch('https://api.github.com/repos/' + CORE_REPO + '/commits/main', { muteHttpExceptions: true, headers: { Accept: 'application/vnd.github.sha' } });
+    const sha = r.getResponseCode() === 200 ? r.getContentText().trim() : '';
+    if (/^[0-9a-f]{40}$/.test(sha)) return 'https://raw.githubusercontent.com/' + CORE_REPO + '/' + sha + '/server/' + name;
+  } catch (e) { }
+  return CORE_BASE + name + '?t=' + Math.floor(Date.now() / 60000);
+}
 const CORE_TTL = 600;            // مدة الاحتفاظ بالنسخة قبل فحص التحديث (ثوانٍ)
 const CORE_CHUNK = 90000;        // حجم الجزء في الذاكرة المؤقتة
 const CORE_SHEET = 'نسخة الخادم - الحلقات'; // ورقة مخفية تحفظ آخر نسخة سليمة
@@ -67,7 +77,7 @@ function getFile_(name, valid) {
   }
   let src = null;
   try {
-    const r = UrlFetchApp.fetch(CORE_BASE + name + '?t=' + Math.floor(Date.now() / 60000), { muteHttpExceptions: true, followRedirects: true });
+    const r = UrlFetchApp.fetch(coreUrl_(name), { muteHttpExceptions: true, followRedirects: true });
     if (r.getResponseCode() === 200) {
       const s = r.getContentText('UTF-8');
       if (valid(s)) src = s; else console.error('نسخة غير سليمة من GitHub: ' + name);
