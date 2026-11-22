@@ -58,9 +58,9 @@ function recordMedia(kind, label, opts = {}) {
 }
 
 /* عرض قائمة تسجيلات مع تشغيل/حذف/مشاركة */
-function mediaListHTML(list, editable) {
-  list = list || []; if (!list.length) return '';
-  return `<div class="media-list">${list.map((x, i) => `<div class="row small" style="padding:6px;border:1px solid var(--line);border-radius:10px;margin:4px 0;background:#fff">
+function mediaListHTML(list, editable, sub) {
+  list = list || []; const idx = list.map((x, i) => i).filter(i => sub === undefined || (list[i].sub || '') === sub); if (!idx.length) return '';
+  return `<div class="media-list">${idx.map(i => [list[i], i]).map(([x, i]) => `<div class="row small" style="padding:6px;border:1px solid var(--line);border-radius:10px;margin:4px 0;background:#fff">
     <span>${x.type === 'video' ? '🎥' : '🎙️'}</span><b style="flex:1">${esc(x.label || 'تسجيل')}</b><span class="muted">${x.dur ? Math.floor(x.dur / 60) + ':' + String(x.dur % 60).padStart(2, '0') : ''}</span>
     ${x.share ? '<span class="chip green">مُرسل لولي الأمر</span>' : '<span class="chip gray">للمعلم فقط</span>'}
     <a class="btn sm light" href="${esc(x.url)}" target="_blank">▶️ تشغيل</a>${editable ? `<button type="button" class="btn sm ghost" data-mshare="${i}">${x.share ? '🔒 إخفاء' : '📤 مشاركة'}</button><button type="button" class="btn sm ghost" data-mdel="${i}">✕</button>` : ''}</div>`).join('')}</div>`;
@@ -72,7 +72,10 @@ function bindMediaList(root, list, onChange) {
   });
 }
 /* مشغل مضمّن لصفحة ولي الأمر */
-function mediaPlayers(list) {
-  list = (list || []).filter(x => x.share); if (!list.length) return '';
+function mediaPlayers(list, sub) {
+  list = (list || []).filter(x => x.share && (sub === undefined || (x.sub || '') === sub)); if (!list.length) return '';
   return list.map(x => `<div style="margin:6px 0"><div class="small"><b>${x.type === 'video' ? '🎥' : '🎙️'} ${esc(x.label || '')}</b></div><iframe src="${esc(drivePreview(x.url))}" style="width:100%;height:${x.type === 'video' ? 240 : 70}px;border:0;border-radius:12px;background:#f3f0e8" allow="autoplay" loading="lazy"></iframe></div>`).join('');
 }
+
+/* أزرار تسجيل صغيرة لرأس أي قسم */
+function recButtons(sub) { return mediaSupported() ? `<button type="button" class="btn sm light rec-b" data-rec="audio" data-rsub="${sub}" title="تسجيل صوتي">🎙️</button><button type="button" class="btn sm light rec-b" data-rec="video" data-rsub="${sub}" title="تسجيل فيديو">🎥</button>` : ''; }

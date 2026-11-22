@@ -36,13 +36,13 @@ function curEditorHTML(cid, x, sid, date) {
   const c = curById(cid); x = x || {};
   const prev = allRecsOf(sid).filter(r => r.date < date && r.cur && r.cur[cid] && r.cur[cid].lesson).pop();
   const L = x.lesson ? c.lessons[x.lesson - 1] : null;
-  return `<div class="sec" data-cur="${cid}"><div class="sec-h"><span>${c.icon}</span>${esc(c.name)}<span class="sp"></span>${c.book ? `<span class="small muted">📘 ${esc(c.book.replace('.pdf', ''))}</span>` : ''}</div>
+  return `<div class="sec" data-cur="${cid}"><div class="sec-h"><span>${c.icon}</span>${esc(c.name)}<span class="sp"></span>${recButtons(cid)}${c.book ? `<span class="small muted">📘 ${esc(c.book.replace('.pdf', ''))}</span>` : ''}</div>
     ${prev ? `<div class="small muted" style="margin-bottom:6px">آخر تسجيل (${fmtDate(prev.date, false)}): <b>${esc((c.lessons[prev.cur[cid].lesson - 1] || {}).t || '')}</b> ${gradeChip(prev.cur[cid].grade)}${!x.lesson ? ` <button type="button" class="btn sm gold" data-csug="${cid}">↩️ متابعة</button>` : ''}</div>` : ''}
     <select class="inp" data-cles="${cid}"><option value="">— اختر الدرس —</option>${c.lessons.map((l, i) => `<option value="${i + 1}" ${x.lesson == i + 1 ? 'selected' : ''}>${i + 1}. ${esc(l.t)}${l.p ? ' (ص ' + l.p + ')' : ''}</option>`).join('')}</select>
     ${L ? `<div class="small muted" style="margin:8px 0 4px">اضغط على ما أتقنه الطالب ✔️ — وضاعف الضغط (أو فعّل وضع الأخطاء) على ما أخطأ فيه ✖️</div>
       <div class="row" style="margin-bottom:6px"><button type="button" class="btn sm ghost" data-call="${cid}">✔️ الكل</button><label class="row small"><input type="checkbox" data-cerr="${cid}"> وضع تحديد الأخطاء</label></div>
       <div class="noor-items">${L.items.map((it, i) => `<button type="button" data-citem="${cid}|${i}" class="${(x.errs || []).includes(i) ? 'err' : (x.items || []).includes(i) ? 'in' : ''}" style="font-family:Tajawal;font-size:14px">${(x.errs || []).includes(i) ? '✖️ ' : (x.items || []).includes(i) ? '✔️ ' : ''}${esc(it)}</button>`).join('')}</div>` : ''}
-    <div style="margin-top:8px">${gradeButtons(x.grade, 'cur|' + cid)}</div></div>`;
+    <div style="margin-top:8px">${gradeButtons(x.grade, 'cur|' + cid)}</div>${typeof DAILY_MEDIA !== 'undefined' && DAILY_MEDIA ? `<div data-mlist="${cid}">${mediaListHTML(DAILY_MEDIA, true, cid)}</div>` : ''}</div>`;
 }
 function curSuggest(sid, date, cid) {
   const c = curById(cid); const pr = curProgress(sid, cid, allRecsOf(sid).filter(r => r.date < date));
