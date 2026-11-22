@@ -231,7 +231,7 @@ function modal({ title, body, foot, wide, onClose }) {
 }
 function confirmBox(msg, okText = 'تأكيد', danger = true) {
   return new Promise(res => {
-    const m = modal({ title: 'تأكيد', body: `<p style="font-size:16px">${msg}</p>`, foot: `<button class="btn ${danger ? 'red' : ''}" data-ok>${okText}</button><button class="btn ghost" data-no>إلغاء</button>`, onClose: () => res(false) });
+    const m = modal({ title: 'تأكيد', body: `<p style="font-size:18.5px">${msg}</p>`, foot: `<button class="btn ${danger ? 'red' : ''}" data-ok>${okText}</button><button class="btn ghost" data-no>إلغاء</button>`, onClose: () => res(false) });
     $('[data-ok]', m.el).onclick = () => { m.el.remove(); res(true); };
     $('[data-no]', m.el).onclick = () => m.close();
   });
@@ -256,3 +256,11 @@ function repHeader(title, sub) {
 function resizeImage(file, max = 260) {
   return new Promise(res => { const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { const k = Math.min(1, max / Math.max(im.width, im.height)); const c = document.createElement('canvas'); c.width = im.width * k; c.height = im.height * k; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', .85)); }; im.src = r.result; }; r.readAsDataURL(file); });
 }
+
+/* ——— حجم الخط على هذا الجهاز (عادي / كبير / كبير جداً) ——— */
+const FS_LEVELS = [1, 1.12, 1.25];
+function fsLevel() { const n = +(localStorage.getItem('tz_fs') || 0); return FS_LEVELS[n] ? n : 0; }
+function applyFS() { document.body.style.zoom = FS_LEVELS[fsLevel()]; document.querySelectorAll('[data-fs]').forEach(b => b.textContent = ['أ', 'أ+', 'أ++'][fsLevel()]); }
+const fsBtn = () => `<button type="button" class="fs-btn" data-fs title="تكبير الخط">${['أ', 'أ+', 'أ++'][fsLevel()]}</button>`;
+document.addEventListener('click', e => { if (!e.target.closest('[data-fs]')) return; localStorage.setItem('tz_fs', (fsLevel() + 1) % FS_LEVELS.length); applyFS(); toast(['حجم الخط: عادي', 'حجم الخط: كبير', 'حجم الخط: كبير جداً'][fsLevel()]); });
+document.addEventListener('DOMContentLoaded', applyFS); if (document.body) applyFS();

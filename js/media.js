@@ -10,8 +10,8 @@ function recordMedia(kind, label, opts = {}) {
     let stream = null, rec = null, chunks = [], blob = null, t0 = 0, timer = null, done = false;
     const m = modal({ title: (isVid ? '🎥 تسجيل فيديو' : '🎙️ تسجيل صوتي') + ' — ' + esc(label || ''), body: `
       <div style="text-align:center">
-        ${isVid ? '<video id="mv" playsinline muted style="width:100%;max-height:52vh;background:#000;border-radius:14px"></video>' : '<div id="ma" style="font-size:80px;line-height:1.4">🎙️</div>'}
-        <div id="mt" style="font-size:28px;font-weight:800;color:var(--teal);margin:8px 0">00:00</div>
+        ${isVid ? '<video id="mv" playsinline muted style="width:100%;max-height:52vh;background:#000;border-radius:14px"></video>' : '<div id="ma" style="font-size:92px;line-height:1.4">🎙️</div>'}
+        <div id="mt" style="font-size:32px;font-weight:800;color:var(--teal);margin:8px 0">00:00</div>
         <div id="mp"></div>
         <div class="row" style="justify-content:center;margin-top:8px"><button class="btn red" id="mrec">⏺️ ابدأ التسجيل</button><button class="btn light" id="mstop" hidden>⏹️ إيقاف</button><button class="btn ghost" id="mre" hidden>🔁 إعادة</button></div>
         <label class="row small" style="justify-content:center;margin-top:12px"><input type="checkbox" id="mshare" ${opts.share !== false ? 'checked' : ''}> إرسال التسجيل لولي الأمر (يظهر في صفحة الطالب)</label>

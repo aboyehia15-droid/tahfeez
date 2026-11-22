@@ -24,8 +24,8 @@ function shell(active) {
     <div class="main">
       ${isLocal() ? `<div class="mode-banner no-print">💾 يعمل التطبيق الآن على هذا الجهاز فقط. ليصل المعلمون وأولياء الأمور من أجهزتهم <a href="#/settings/server">اربطه بالخادم من هنا</a></div>` : ''}
       ${viewingArchive() ? `<div class="mode-banner no-print" style="background:#e4ecfb;color:#24427e">🔒 تعرض الآن بيانات العام الدراسي <b>${esc(S.viewYear)}</b> (مغلق — للعرض والتقارير فقط) <a href="#" id="back-year" style="color:#24427e">↩️ العودة للعام الحالي ${esc(curYear())}</a></div>` : ''}
-      <div class="topbar"><div><h1>${esc(st.programName)} <button class="chip gold" id="year-chip" style="border:0;cursor:pointer;font-size:12px;vertical-align:middle">📅 ${esc(S.viewYear || curYear())}${viewingArchive() ? ' 🔒' : ''}</button></h1><div class="who">${S.me ? '👤 ' + esc(S.me.name) + ' · ' : ''}<span id="sync-st"></span></div></div>
-        <div class="logos"><img src="${logoR()}" alt="جمعية تعلم"><img src="${logoL()}" alt="مجمع ابن تيمية"></div></div>
+      <div class="topbar"><div><h1>${esc(st.programName)} <button class="chip gold" id="year-chip" style="border:0;cursor:pointer;font-size:14px;vertical-align:middle">📅 ${esc(S.viewYear || curYear())}${viewingArchive() ? ' 🔒' : ''}</button></h1><div class="who">${S.me ? '👤 ' + esc(S.me.name) + ' · ' : ''}<span id="sync-st"></span></div></div>
+        ${fsBtn()}<div class="logos"><img src="${logoR()}" alt="جمعية تعلم"><img src="${logoL()}" alt="مجمع ابن تيمية"></div></div>
       <div class="content" id="view"></div>
     </div>
     <nav class="bottom-nav">${bottom.map(n => `<a href="#/${n.k}" class="${active === n.k ? 'on' : ''}"><span class="ic">${n.ic}</span>${n.t.split(' ')[0]}</a>`).join('')}<a href="#" id="more-lnk"><span class="ic">☰</span>المزيد</a></nav>
@@ -36,7 +36,7 @@ function bindShell() {
   const yc = $('#year-chip'); if (yc) yc.onclick = yearDialog;
   const by = $('#back-year'); if (by) by.onclick = e => { e.preventDefault(); S.viewYear = ''; render(); };
   const lo = $('#logout-lnk'); if (lo) lo.onclick = async e => { e.preventDefault(); if (isLocal()) { location.hash = '#/settings/server'; return; } if (await confirmBox('تسجيل الخروج من التطبيق؟', 'خروج')) { S.me = null; S.token = null; saveSession(); render(); } };
-  const mo = $('#more-lnk'); if (mo) mo.onclick = e => { e.preventDefault(); const m = modal({ title: 'القائمة', body: `<div class="grid g3">${NAV().map(n => `<a class="btn light" style="flex-direction:column;padding:14px" href="#/${n.k}"><span style="font-size:24px">${n.ic}</span>${n.t}</a>`).join('')}</div>`, foot: false }); $$('a', m.body).forEach(a => a.addEventListener('click', () => m.close())); };
+  const mo = $('#more-lnk'); if (mo) mo.onclick = e => { e.preventDefault(); const m = modal({ title: 'القائمة', body: `<div class="grid g3">${NAV().map(n => `<a class="btn light" style="flex-direction:column;padding:14px" href="#/${n.k}"><span style="font-size:27.5px">${n.ic}</span>${n.t}</a>`).join('')}</div>`, foot: false }); $$('a', m.body).forEach(a => a.addEventListener('click', () => m.close())); };
 }
 
 /* ——— إحصاءات الطالب ——— */
@@ -185,7 +185,7 @@ function studentMenu(st) {
     ${f.fees && canAdmin() ? '<button class="btn light" data-a="fees">💰 الرسوم</button>' : ''}
     ${isAdmin() ? '<button class="btn red" data-a="del">🗑️ حذف نهائي</button>' : ''}
   </div>
-  <div class="card" style="margin-top:12px;font-size:13px">${st.birthDate ? `<div><span class="muted">العمر:</span> <b>${ageFrom(st.birthDate)} سنوات</b>${st.birthDateHijri ? ` <span class="muted">(الميلاد هجري: ${esc(st.birthDateHijri)})</span>` : ''}</div>` : ''}${STU_FIELDS.filter(x => st[x[0]]).map(x => `<div><span class="muted">${x[1]}:</span> ${esc(st[x[0]])}</div>`).join('')}</div>`, foot: false });
+  <div class="card" style="margin-top:12px;font-size:15px">${st.birthDate ? `<div><span class="muted">العمر:</span> <b>${ageFrom(st.birthDate)} سنوات</b>${st.birthDateHijri ? ` <span class="muted">(الميلاد هجري: ${esc(st.birthDateHijri)})</span>` : ''}</div>` : ''}${STU_FIELDS.filter(x => st[x[0]]).map(x => `<div><span class="muted">${x[1]}:</span> ${esc(st[x[0]])}</div>`).join('')}</div>`, foot: false });
   m.body.onclick = async e => {
     const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
     if (!st.parentToken) { st.parentToken = token20(); save('students', st); }
@@ -318,7 +318,7 @@ function viewRegister(v) {
     <div class="grid g2">
       <div class="card"><h3>🔗 رابط نموذج التسجيل</h3>
         <p class="small muted">نموذج التسجيل مبني على أعمدة «كشف بيانات الطلاب»: الاسم رباعياً، السجل المدني، الجنسية، تاريخ الميلاد (والعمر يُحسب تلقائياً)، بيانات ولي الأمر وجوالاته، صلة القرابة، جهة العمل، الخلفية السابقة، الحالة الصحية.</p>
-        <div class="row"><input class="inp grow" value="${esc(link)}" readonly dir="ltr" style="font-size:12px"><button class="btn sm" id="cp">📋 نسخ</button><a class="btn sm light" target="_blank" href="${esc(link)}">👁️ معاينة</a></div>
+        <div class="row"><input class="inp grow" value="${esc(link)}" readonly dir="ltr" style="font-size:14px"><button class="btn sm" id="cp">📋 نسخ</button><a class="btn sm light" target="_blank" href="${esc(link)}">👁️ معاينة</a></div>
         <div class="toggle-row"><span>استقبال التسجيلات <span class="small muted">(إغلاقه يوقف النموذج)</span></span><label class="switch"><input type="checkbox" id="regopen" ${st.regClosed ? '' : 'checked'}><span></span></label></div>
         <div class="row" style="margin-top:10px"><button class="btn gold" id="poster">🖨️ طباعة ملصق بالباركود QR</button></div>
       </div>
@@ -348,7 +348,7 @@ function viewRegister(v) {
   $('#poster').onclick = async () => {
     await loadQR();
     const w = window.open('', '_blank');
-    w.document.write(`<html dir="rtl"><head><title>ملصق التسجيل</title><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;800&display=swap" rel="stylesheet"><style>body{font-family:Tajawal;text-align:center;padding:30px;color:#0f5c55}.lg{display:flex;justify-content:space-between}.lg img{height:110px}h1{font-size:40px;margin:20px 0 6px}h2{color:#c9a227;margin:0 0 20px}#qr{display:inline-block;padding:16px;border:6px solid #c9a227;border-radius:20px}p{font-size:20px;color:#333}</style></head><body><div class="lg"><img src="${new URL(logoR(), location.href)}"><img src="${new URL(logoL(), location.href)}"></div><h1>سجّل ابنك الآن</h1><h2>${esc(st.programName)} — ${esc(st.complexName)}</h2><div id="qr"></div><p>امسح الرمز بكاميرا الجوال لفتح نموذج التسجيل</p><p style="font-size:13px;direction:ltr">${esc(link)}</p></body></html>`);
+    w.document.write(`<html dir="rtl"><head><title>ملصق التسجيل</title><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;800&display=swap" rel="stylesheet"><style>body{font-family:Tajawal;text-align:center;padding:30px;color:#0f5c55}.lg{display:flex;justify-content:space-between}.lg img{height:110px}h1{font-size:46px;margin:20px 0 6px}h2{color:#c9a227;margin:0 0 20px}#qr{display:inline-block;padding:16px;border:6px solid #c9a227;border-radius:20px}p{font-size:23px;color:#333}</style></head><body><div class="lg"><img src="${new URL(logoR(), location.href)}"><img src="${new URL(logoL(), location.href)}"></div><h1>سجّل ابنك الآن</h1><h2>${esc(st.programName)} — ${esc(st.complexName)}</h2><div id="qr"></div><p>امسح الرمز بكاميرا الجوال لفتح نموذج التسجيل</p><p style="font-size:15px;direction:ltr">${esc(link)}</p></body></html>`);
     w.document.close();
     const s = w.document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js'; s.onload = () => { new w.QRCode(w.document.getElementById('qr'), { text: link, width: 280, height: 280, colorDark: '#0f5c55' }); setTimeout(() => w.print(), 700); }; w.document.body.appendChild(s);
   };
@@ -366,7 +366,7 @@ function viewClasses(v, sub) {
     $('#addbtn').onclick = () => classForm();
     const cls = T('classes').slice().sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     const noCls = activeStudents().filter(s => !s.classId).length;
-    box.innerHTML = (noCls ? `<div class="card" style="background:#fff8e1">⚠️ يوجد <b>${noCls}</b> طالب نشط بدون فصل. افتح الفصل واضغط «👦 الطلاب» لإضافتهم.</div>` : '') + (cls.length ? `<div class="grid g3">${cls.map(c => { const t = teacherOf(c); const n = studentsOfClass(c.id).length; return `<div class="card"><h3><span class="avatar" style="width:36px;height:36px;font-size:14px;background:${colorOf(c.name)}">${initials(c.name)}</span>${esc(c.name)}</h3>
+    box.innerHTML = (noCls ? `<div class="card" style="background:#fff8e1">⚠️ يوجد <b>${noCls}</b> طالب نشط بدون فصل. افتح الفصل واضغط «👦 الطلاب» لإضافتهم.</div>` : '') + (cls.length ? `<div class="grid g3">${cls.map(c => { const t = teacherOf(c); const n = studentsOfClass(c.id).length; return `<div class="card"><h3><span class="avatar" style="width:36px;height:36px;font-size:16px;background:${colorOf(c.name)}">${initials(c.name)}</span>${esc(c.name)}</h3>
       <div class="small">👨‍🏫 ${t ? esc(t.name) : '<span class="muted">لم يُحدد معلم</span>'}</div><div class="row small" style="margin:8px 0"><span class="chip">${TRACKS[c.track] || 'قرآن'}</span><span class="chip gold">${n} طالب</span>${(c.subjects || ['quran', 'noor', 'zad']).map(x => `<span class="chip gray">${{ quran: 'القرآن', noor: 'النورانية', zad: 'زاد الطفل' }[x] || (curById(x) ? curById(x).icon + ' ' + curById(x).name : '')}</span>`).join('')}</div>
       <div class="row"><button class="btn sm light" data-stu="${c.id}">👦 الطلاب</button><button class="btn sm light" data-edit="${c.id}">✏️ تعديل</button><a class="btn sm" href="#/daily/${c.id}">📖 المتابعة</a></div></div>`; }).join('')}</div>` : '<div class="card empty"><span class="e">🏫</span>أنشئ أول فصل واكتب اسمه واختر معلمه</div>');
     box.onclick = e => { const s = e.target.closest('[data-stu]'); if (s) classStudentsDialog(byId('classes', s.dataset.stu)); const ed = e.target.closest('[data-edit]'); if (ed) classForm(byId('classes', ed.dataset.edit)); };
@@ -374,7 +374,7 @@ function viewClasses(v, sub) {
     $('#addbtn').onclick = () => userForm();
     const us = T('users').slice().sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     const loginLink = appBase() + (S.server && S.server !== window.DEFAULT_SERVER ? '?s=' + encodeURIComponent(S.server) : '');
-    box.innerHTML = `${S.server ? `<div class="card"><b>🔑 رابط دخول المعلمين:</b> أرسله للمعلم مع اسم المستخدم وكلمة المرور ليثبّت التطبيق على جواله.<div class="row" style="margin-top:6px"><input class="inp grow" readonly dir="ltr" value="${esc(loginLink)}" style="font-size:12px"><button class="btn sm" id="cpl">📋 نسخ</button></div></div>` : '<div class="card" style="background:#fff8e1">في الوضع المحلي تُستخدم أسماء المعلمين للفصول والتقارير فقط. بعد الربط بالخادم يدخل كل معلم بحسابه ويرى فصوله فقط.</div>'}
+    box.innerHTML = `${S.server ? `<div class="card"><b>🔑 رابط دخول المعلمين:</b> أرسله للمعلم مع اسم المستخدم وكلمة المرور ليثبّت التطبيق على جواله.<div class="row" style="margin-top:6px"><input class="inp grow" readonly dir="ltr" value="${esc(loginLink)}" style="font-size:14px"><button class="btn sm" id="cpl">📋 نسخ</button></div></div>` : '<div class="card" style="background:#fff8e1">في الوضع المحلي تُستخدم أسماء المعلمين للفصول والتقارير فقط. بعد الربط بالخادم يدخل كل معلم بحسابه ويرى فصوله فقط.</div>'}
       <div class="card" style="padding:4px 8px">${us.length ? us.map(u => `<div class="list-item"><div class="avatar" style="background:${colorOf(u.name)}">${initials(u.name)}</div><div style="flex:1"><b>${esc(u.name)}</b><div class="small muted">${{ admin: '👑 مدير', supervisor: '🧭 مشرف', teacher: '👨‍🏫 معلم' }[u.role] || ''} · ${esc(u.username || '')} ${u.phone ? '· <span dir="ltr">' + esc(u.phone) + '</span>' : ''} ${u.active === false ? '<span class="chip red">موقوف</span>' : ''}</div>
       <div class="row small">${T('classes').filter(c => c.teacherId === u.id).map(c => `<span class="chip">${esc(c.name)}</span>`).join('')}</div></div>
       ${u.phone && S.server ? `<a class="btn sm wa" target="_blank" href="${waLink(u.phone, 'السلام عليكم أستاذ ' + u.name + '\nرابط دخول منصة متابعة الحلقات:\n' + loginLink + '\nاسم المستخدم: ' + (u.username || ''))}">💬</a>` : ''}<button class="btn sm light" data-u="${u.id}">✏️</button></div>`).join('') : '<div class="empty"><span class="e">👨‍🏫</span>أضف المعلمين ليتم ربطهم بالفصول</div>'}</div>`;
@@ -574,7 +574,7 @@ function paymentDialog(st, after) {
 function receipt(p) {
   const st = byId('students', p.studentId); const s = S.settings; const f = feeOf(st), paid = paidOf(st);
   const m = modal({ title: '🧾 سند قبض', body: `<div class="report" id="rcp">${repHeader('سند قبض رسوم', 'رقم السند: ' + (p.receipt || '') + ' — ' + fmtDate(p.date) + ' — ' + hijri(p.date))}
-    <div style="font-size:16px;line-height:2.2">استلمنا من ولي أمر الطالب: <b>${esc(st.name)}</b><br>مبلغاً وقدره: <b style="font-size:20px;color:var(--teal)">${num(p.amount)} ${s.currency}</b> — ${esc(p.method || '')}<br>وذلك عن: رسوم ${esc(s.programName)} ${p.note ? '— ' + esc(p.note) : ''}<br>
+    <div style="font-size:18.5px;line-height:2.2">استلمنا من ولي أمر الطالب: <b>${esc(st.name)}</b><br>مبلغاً وقدره: <b style="font-size:23px;color:var(--teal)">${num(p.amount)} ${s.currency}</b> — ${esc(p.method || '')}<br>وذلك عن: رسوم ${esc(s.programName)} ${p.note ? '— ' + esc(p.note) : ''}<br>
     <span class="muted">إجمالي الرسوم: ${num(f)} — إجمالي المسدد: ${num(paid)} — المتبقي: ${num(Math.max(0, f - paid))}</span></div>
     <div class="rep-foot"><span>المستلم: ${esc(S.me ? S.me.name : '')}</span><span>الختم</span></div></div>`,
     foot: `<button class="btn" onclick="printEl('#rcp')">🖨️ طباعة</button><a class="btn wa" target="_blank" href="${waLink(st.guardianPhone, 'السلام عليكم ورحمة الله\nتم استلام مبلغ ' + num(p.amount) + ' ' + s.currency + ' رسوم الطالب ' + st.name + ' بتاريخ ' + fmtDate(p.date, false) + '.\nالمتبقي: ' + num(Math.max(0, f - paid)) + ' ' + s.currency + '\nجزاكم الله خيراً — ' + s.complexName)}">💬 إرسال لولي الأمر</a>` });
@@ -718,7 +718,7 @@ function serverSettings(box) {
 function viewLogin(root) {
   root.innerHTML = `<div class="login"><div class="box"><div class="lg"><img src="${logoR()}"><img src="${logoL()}"></div><h2 style="color:var(--teal);margin:6px 0">منصة متابعة الحلقات</h2><p class="muted small">${esc(S.settings.complexName)}</p>
     <input class="inp" id="lu" placeholder="اسم المستخدم" dir="ltr" style="margin-bottom:8px"><input class="inp" id="lp" type="password" placeholder="كلمة المرور" dir="ltr" style="margin-bottom:12px"><button class="btn block" id="lb">دخول</button>
-    <button class="btn ghost block" id="lx" style="margin-top:8px;font-size:12px">العمل محلياً بدون خادم</button></div></div>`;
+    <button class="btn ghost block" id="lx" style="margin-top:8px;font-size:14px">العمل محلياً بدون خادم</button></div></div>`;
   const go = async () => { const b = $('#lb'); b.disabled = true; b.textContent = '⏳'; try { const r = await api('login', { username: $('#lu').value.trim(), password: $('#lp').value }); if (!r.ok) throw new Error(r.error); S.token = r.token; S.me = r.user; saveSession(); await pull(true); location.hash = '#/home'; render(); } catch (e) { toast('⚠️ ' + e.message); } b.disabled = false; b.textContent = 'دخول'; };
   $('#lb').onclick = go; $('#lp').onkeydown = e => e.key === 'Enter' && go();
   $('#lx').onclick = async () => { if (await confirmBox('فصل الربط بالخادم والعمل محلياً على هذا الجهاز؟', 'نعم', false)) { localStorage.removeItem(LS.server); localStorage.setItem('tz_local', '1'); S.server = ''; render(); } };
@@ -790,7 +790,7 @@ function yearStats(name) {
 function yearDialog() {
   const ys = S.settings.years || []; const cur = curYear();
   const rows = ys.map(y => ({ name: y.name, from: yearRange(y.name)[0], to: y.to, closed: true })).concat([{ name: cur, from: yearRange(cur)[0], to: '', closed: false }]).reverse();
-  const m = modal({ title: '📅 الأعوام الدراسية', body: `${rows.map(y => { const o = yearStats(y.name); return `<div class="card" style="margin-bottom:8px;${(S.viewYear || cur) === y.name ? 'border:2px solid var(--gold)' : ''}"><div class="row"><b style="font-size:17px;flex:1">العام ${esc(y.name)} ${y.closed ? '<span class="chip gray">🔒 مغلق</span>' : '<span class="chip green">الحالي</span>'}</b><button class="btn sm ${y.closed ? 'light' : ''}" data-view="${esc(y.name)}">👁️ عرض</button></div>
+  const m = modal({ title: '📅 الأعوام الدراسية', body: `${rows.map(y => { const o = yearStats(y.name); return `<div class="card" style="margin-bottom:8px;${(S.viewYear || cur) === y.name ? 'border:2px solid var(--gold)' : ''}"><div class="row"><b style="font-size:19.5px;flex:1">العام ${esc(y.name)} ${y.closed ? '<span class="chip gray">🔒 مغلق</span>' : '<span class="chip green">الحالي</span>'}</b><button class="btn sm ${y.closed ? 'light' : ''}" data-view="${esc(y.name)}">👁️ عرض</button></div>
       <div class="small muted" style="margin-top:4px">${y.from ? 'من ' + fmtDate(y.from, false) : 'من البداية'}${y.to ? ' إلى ' + fmtDate(y.to, false) : ' — مستمر'}</div>
       <div class="row small" style="margin-top:6px"><span class="chip">👦 ${o.students} طالب</span><span class="chip">🏫 ${o.classes} فصل</span><span class="chip">📖 ${num(o.pages)} وجه حفظ</span><span class="chip gold">💰 ${num(o.paid)} ${S.settings.currency}</span></div></div>`; }).join('')}
     ${isAdmin() && !viewingArchive() ? `<div class="card" style="background:#fff8e1"><h3>🔐 إغلاق العام ${esc(cur)} وبدء عام جديد</h3><p class="small">يُحفظ كل ما في العام الحالي كما هو (الطلاب وفصولهم ومعلموهم، الحفظ والمراجعة والنورانية وزاد الطفل، الغياب، الرسوم والإيصالات) ويمكن الرجوع إليه وطباعة تقاريره في أي وقت. ويبدأ العام الجديد بسجل متابعة ورسوم جديدة، مع بقاء خريطة الحفظ ومسار النورانية لكل طالب متصلة.</p><button class="btn red" id="close-year">🔐 إغلاق العام ${esc(cur)}</button></div>` : ''}`, foot: false });

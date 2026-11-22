@@ -179,7 +179,7 @@ function ayahBoxHTML(range, errors) {
   let html = ''; let any = false; let lastS = 0;
   set.forEach(k => {
     const [s, a] = Q.absToSA(k); const txt = ayahTextAvailable(s); if (!txt) return; any = true;
-    if (s !== lastS) { html += `<div style="text-align:center;font-family:Tajawal;font-size:13px;color:#8a6d0e;margin:4px 0">﴿ سورة ${Q.names[s - 1]} ﴾</div>`; lastS = s; }
+    if (s !== lastS) { html += `<div style="text-align:center;font-family:Tajawal;font-size:15px;color:#8a6d0e;margin:4px 0">﴿ سورة ${Q.names[s - 1]} ﴾</div>`; lastS = s; }
     txt[a - 1].split(/\s+/).forEach((w, wi) => {
       const e = (errors || []).find(x => x.s == s && x.a == a && x.w == wi);
       html += `<span class="w ${e ? (e.fixed ? 'fixed' : 'err') : ''}" data-s="${s}" data-a="${a}" data-w="${wi}">${esc(w)}</span> `;

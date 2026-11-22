@@ -31,7 +31,7 @@ async function viewParent(root, tokenP) {
     if (cached && cached.student) { s = apply(cached); show(s); root.insertAdjacentHTML('afterbegin', '<div class="p-sync" id="psync">⏳ يتم تحديث البيانات…</div>'); }
     try {
       const r = await api('parent', { t: tokenP });
-      if (!r.ok) { try { localStorage.removeItem(CK); } catch (e) {} root.innerHTML = `<div class="splash"><div style="font-size:50px">⚠️</div><div>${esc(r.error)}</div></div>`; return; }
+      if (!r.ok) { try { localStorage.removeItem(CK); } catch (e) {} root.innerHTML = `<div class="splash"><div style="font-size:57.5px">⚠️</div><div>${esc(r.error)}</div></div>`; return; }
       const txt = JSON.stringify(r);
       if (!cached || JSON.stringify(cached) !== txt) { const y = window.scrollY; s = apply(r); show(s); window.scrollTo(0, y); }
       else { const ps = $('#psync'); if (ps) ps.remove(); }
@@ -39,11 +39,11 @@ async function viewParent(root, tokenP) {
       return;
     } catch (e) {
       if (cached && cached.student) { const ps = $('#psync'); if (ps) ps.textContent = '📡 بدون اتصال — آخر بيانات محفوظة'; return; }
-      root.innerHTML = '<div class="splash"><div style="font-size:50px">📡</div><div>تعذر الاتصال، تحقق من الإنترنت وأعد المحاولة</div><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>'; return;
+      root.innerHTML = '<div class="splash"><div style="font-size:57.5px">📡</div><div>تعذر الاتصال، تحقق من الإنترنت وأعد المحاولة</div><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>'; return;
     }
   } else {
     s = T('students').find(x => x.parentToken === tokenP);
-    if (!s) { root.innerHTML = '<div class="splash"><div style="font-size:50px">🔒</div><div>الرابط غير صحيح — أو أن التطبيق غير مربوط بالخادم بعد</div></div>'; return; }
+    if (!s) { root.innerHTML = '<div class="splash"><div style="font-size:57.5px">🔒</div><div>الرابط غير صحيح — أو أن التطبيق غير مربوط بالخادم بعد</div></div>'; return; }
   }
   document.title = 'متابعة الطالب: ' + s.name;
   drawParent(root, s);
@@ -66,21 +66,21 @@ function drawParent(root, s) {
   const calMonth = PV.k === 'custom' || PV.k === 'all' ? todayISO() : (to || todayISO());
   const [m1, m2] = monthRange(calMonth);
   const recMap = {}; all.forEach(r => recMap[r.date] = r);
-  let cal = ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'].map(d => `<div class="h" style="font-size:10.5px">${d}</div>`).join('');
+  let cal = ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'].map(d => `<div class="h" style="font-size:12px">${d}</div>`).join('');
   for (let i = 0; i < parseISO(m1).getDay(); i++) cal += '<div class="d x"></div>';
   for (let d = m1; d <= m2; d = addDays(d, 1)) { const r = recMap[d]; cal += `<div class="d ${r && r.att ? r.att : ''}" title="${r && r.att ? ATT[r.att][0] : ''}">${parseISO(d).getDate()}</div>`; }
   const timeline = o.recs.slice().reverse();
   root.innerHTML = `<div class="parent">
-    <div class="p-hero"><div class="logos"><img src="${logoR()}"><img src="${logoL()}"></div>
+    <div class="p-hero">${fsBtn().replace('class="fs-btn"', 'class="fs-btn p-fs"')}<div class="logos"><img src="${logoR()}"><img src="${logoL()}"></div>
       <h1>${esc(s.name)}</h1><div class="sub">🏫 ${esc(c ? c.name : '')}${t ? ' · 👨‍🏫 الأستاذ ' + esc(t.name) : ''} · ${esc(st.programName)}</div></div>
     <div class="p-body">
-      ${full || V === 'daily' || V === 'period' || V === 'absent' ? '' : `<div class="card" style="text-align:center;padding:10px"><b style="color:var(--teal);font-size:16px">${V === 'exam' ? '📝 نتيجة الاختبار' : V === 'fee' ? '💰 بيان الرسوم' : V === 'absent' ? '📅 الحضور والغياب' : '📅 تقرير ' + lbl}</b></div>`}<div class="card no-print" style="padding:8px;${full || V === 'daily' || V === 'period' || V === 'absent' ? '' : 'display:none'}"><div class="tabs" style="margin:0;justify-content:center">${[['day', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر'], ['all', 'الكل'], ['custom', 'من–إلى']].map(([k, tt]) => `<button data-k="${k}" class="${PV.k === k ? 'on' : ''}">${tt}</button>`).join('')}</div>
+      ${full || V === 'daily' || V === 'period' || V === 'absent' ? '' : `<div class="card" style="text-align:center;padding:10px"><b style="color:var(--teal);font-size:18.5px">${V === 'exam' ? '📝 نتيجة الاختبار' : V === 'fee' ? '💰 بيان الرسوم' : V === 'absent' ? '📅 الحضور والغياب' : '📅 تقرير ' + lbl}</b></div>`}<div class="card no-print" style="padding:8px;${full || V === 'daily' || V === 'period' || V === 'absent' ? '' : 'display:none'}"><div class="tabs p-tabs" style="margin:0;justify-content:center">${[['day', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر'], ['all', 'الكل'], ['custom', 'من–إلى']].map(([k, tt]) => `<button data-k="${k}" class="${PV.k === k ? 'on' : ''}">${tt}</button>`).join('')}</div>
         ${PV.k === 'custom' ? `<div class="row" style="justify-content:center;margin-top:8px"><input type="date" class="inp" id="pf" value="${from}" style="width:auto"> إلى <input type="date" class="inp" id="pt" value="${to}" style="width:auto"></div>` : ''}</div>
       <div class="grid g3" style="${full || per || (V === 'daily' && from !== to) ? '' : 'display:none'}">
         ${f.quran && subj.includes('quran') && (full || PF('hifz') || PF('review')) ? `<div class="stat"><span class="i">📖</span><div class="n">${num(o.hifz)}</div><div class="l">وجه حفظ ${PVIEW ? 'في هذه الفترة' : lbl}</div></div><div class="stat"><span class="i">🔁</span><div class="n">${num(o.reviewAll)}</div><div class="l">وجه مراجعة ${PVIEW ? 'في هذه الفترة' : lbl}${o.far ? ` <small>(بعيدة ${num(o.far)})</small>` : ''}</div></div>` : ''}
         ${full || PF('att') ? `<div class="stat"><span class="i">📅</span><div class="n">${o.days ? o.attPct + '%' : '—'}</div><div class="l">الحضور (${o.p + o.l}/${o.days})${o.a ? ` · <b style="color:var(--red)">غياب ${o.a}</b>` : ''}</div></div>` : ''}
-        ${rk && (full || PF('rank')) ? `<div class="stat"><span class="i">🏆</span><div class="n">${rk.rank}<small style="font-size:14px;color:var(--muted)"> / ${studentsOfClass(c.id).length}</small></div><div class="l">الترتيب في الفصل</div></div>` : ''}
-        ${full || PF('level') ? `<div class="stat"><span class="i">🎖️</span><div class="n" style="font-size:20px">${levelOf(o)}</div><div class="l">المستوى العام</div></div>` : ''}
+        ${rk && (full || PF('rank')) ? `<div class="stat"><span class="i">🏆</span><div class="n">${rk.rank}<small style="font-size:16px;color:var(--muted)"> / ${studentsOfClass(c.id).length}</small></div><div class="l">الترتيب في الفصل</div></div>` : ''}
+        ${full || PF('level') ? `<div class="stat"><span class="i">🎖️</span><div class="n" style="font-size:23px">${levelOf(o)}</div><div class="l">المستوى العام</div></div>` : ''}
         ${full ? `<div class="stat"><span class="i">⭐</span><div class="n">${o.points}</div><div class="l">النقاط</div></div>` : ''}
       </div>
       ${f.quran && subj.includes('quran') && (full || (per && PF('surahs'))) ? `<div class="card" style="margin-top:14px"><h3>📖 خريطة الحفظ</h3>
@@ -89,14 +89,14 @@ function drawParent(root, s) {
         <div class="surah-map">${Array.from({ length: 37 }, (_, i) => 114 - i).map(n => { const p = prog[n - 1]; return `<div class="${p >= 1 ? 'done' : p > 0 ? 'part' : ''}">${Q.names[n - 1]}${p > 0 && p < 1 ? `<i style="width:${p * 100}%"></i>` : ''}</div>`; }).join('')}</div>
         ${prog.slice(0, 77).some(p => p > 0) ? `<div class="small" style="margin-top:8px"><b>سور أخرى:</b> ${prog.slice(0, 77).map((p, i) => p > 0 ? Q.names[i] + (p < 1 ? ' (' + Math.round(p * 100) + '%)' : ' ✓') : '').filter(Boolean).join('، ')}</div>` : ''}</div>` : ''}
       ${full || (per && PF('cur')) ? subj.filter(isCur).map(cid => curParentCard(s, cid)).join('') : ''}
-      ${f.noor && subj.includes('noor') && (full || (per && PF('noor'))) ? `<div class="card"><h3>🔤 القاعدة النورانية</h3>${lastNoor ? `<div style="margin-bottom:8px">وصل إلى: <b>${esc(NOORANIA[lastNoor.noor.lesson - 1].title)}</b>${lastNoor.noor.to ? ` — البند «<span style="font-family:var(--quran);font-size:20px">${esc(NOORANIA[lastNoor.noor.lesson - 1].items[Math.max(lastNoor.noor.from, lastNoor.noor.to) - 1] || '')}</span>»` : ''}</div>` : '<div class="muted small">لم يبدأ بعد</div>'}
+      ${f.noor && subj.includes('noor') && (full || (per && PF('noor'))) ? `<div class="card"><h3>🔤 القاعدة النورانية</h3>${lastNoor ? `<div style="margin-bottom:8px">وصل إلى: <b>${esc(NOORANIA[lastNoor.noor.lesson - 1].title)}</b>${lastNoor.noor.to ? ` — البند «<span style="font-family:var(--quran);font-size:23px">${esc(NOORANIA[lastNoor.noor.lesson - 1].items[Math.max(lastNoor.noor.from, lastNoor.noor.to) - 1] || '')}</span>»` : ''}</div>` : '<div class="muted small">لم يبدأ بعد</div>'}
         <div class="noor-path">${NOORANIA.map((l, i) => `<span class="${lastNoor ? (i + 1 < lastNoor.noor.lesson ? 'done' : i + 1 === lastNoor.noor.lesson ? 'cur' : '') : ''}" title="${esc(l.title)}">${i + 1}</span>`).join('')}</div></div>` : ''}
       ${f.zad && subj.includes('zad') && (full || (per && PF('zad'))) ? `<div class="card"><h3>🌸 زاد الطفل المسلم</h3><div class="badges">${zadCurriculum().map(z => { const got = [...new Set(zadAll.filter(x => x.cat === z.id).map(x => x.item))]; return `<div class="badge-it" style="border-color:${got.length ? z.color : ''}"><span class="e">${z.icon}</span><b>${esc(z.name)}</b><div>${got.length} / ${z.items.length}</div></div>`; }).join('')}</div>
         ${zadAll.length ? `<div class="small" style="margin-top:10px;line-height:2">${zadCurriculum().map(z => { const got = [...new Set(zadAll.filter(x => x.cat === z.id).map(x => x.item))]; return got.length ? `<b>${z.icon} ${esc(z.name)}:</b> ${got.map(esc).join('، ')}` : ''; }).filter(Boolean).join('<br>')}</div>` : ''}</div>` : ''}
       ${S.settings.parentShowExams !== false && (full || V === 'exam' || (per && PF('exams'))) ? parentExamsCard(s, V === 'exam' ? PVIEW.x : '', full || V === 'exam' ? '' : from, full || V === 'exam' ? '' : to) : ''}
       ${full || V === 'absent' || (per && PF('att')) ? `<div class="card"><h3>📅 الحضور — ${MONTHS[parseISO(m1).getMonth()]}</h3><div class="cal">${cal}</div><div class="row small" style="margin-top:8px"><span class="chip green">حاضر</span><span class="chip red">غائب</span><span class="chip gold">متأخر</span><span class="chip blue">مستأذن</span></div></div>` : ''}
       ${full || V === 'daily' || per ? `<div class="card"><h3>🗒️ ${V === 'daily' ? 'ما تم تسجيله' : 'السجل اليومي — ' + lbl}</h3><div class="timeline">${timeline.length ? timeline.map(r => `<div class="ti"><div class="dt">${fmtDate(r.date)} <span class="small muted">${hijri(r.date)}</span></div>${parentDay(r, subj)}</div>`).join('') : '<div class="empty small">لا توجد تسجيلات في هذه الفترة</div>'}</div></div>` : ''}
-      ${f.fees && st.parentShowFees !== false && (full || V === 'fee' || (per && PF('fees'))) && (fee > 0 || (st.parentShowDisc && (s.feeExempt || discountsOf(s).total))) ? `<div class="card"><h3>💰 الرسوم</h3>${s.feeExempt && st.parentShowDisc ? '<div class="chip gray" style="font-size:14px;padding:8px 14px">🎓 الطالب معفى من الرسوم</div>' : ''}${st.parentShowDisc && discountsOf(s).total && !s.feeExempt ? `<div class="small" style="margin-bottom:8px">الرسوم الأساسية ${num(discountsOf(s).base)} ${st.currency}${discountsOf(s).sib ? ' — خصم الأخوة ' + num(discountsOf(s).sib) : ''}${discountsOf(s).spec ? ' — خصم خاص ' + num(discountsOf(s).spec) : ''}</div>` : ''}${s.feeExempt ? '' : kpis([[num(fee), st.parentShowDisc && discountsOf(s).total ? 'المستحق بعد الخصم' : 'الرسوم المقررة'], [num(paid), 'المسدد'], [num(Math.max(0, fee - paid)), 'المتبقي']])}${pays.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الإيصال</th></tr>${pays.map(p => `<tr><td>${fmtDate(p.date, false)}</td><td><b>${num(p.amount)}</b> ${st.currency}</td><td class="small">${esc(p.note || p.method || '')}</td><td>${p.receiptUrl ? `<a class="btn sm light" target="_blank" href="${esc(p.receiptUrl)}">📎 عرض</a>` : '—'}</td></tr>`).join('')}</table>` : ''}</div>` : ''}
+      ${f.fees && st.parentShowFees !== false && (full || V === 'fee' || (per && PF('fees'))) && (fee > 0 || (st.parentShowDisc && (s.feeExempt || discountsOf(s).total))) ? `<div class="card"><h3>💰 الرسوم</h3>${s.feeExempt && st.parentShowDisc ? '<div class="chip gray" style="font-size:16px;padding:8px 14px">🎓 الطالب معفى من الرسوم</div>' : ''}${st.parentShowDisc && discountsOf(s).total && !s.feeExempt ? `<div class="small" style="margin-bottom:8px">الرسوم الأساسية ${num(discountsOf(s).base)} ${st.currency}${discountsOf(s).sib ? ' — خصم الأخوة ' + num(discountsOf(s).sib) : ''}${discountsOf(s).spec ? ' — خصم خاص ' + num(discountsOf(s).spec) : ''}</div>` : ''}${s.feeExempt ? '' : kpis([[num(fee), st.parentShowDisc && discountsOf(s).total ? 'المستحق بعد الخصم' : 'الرسوم المقررة'], [num(paid), 'المسدد'], [num(Math.max(0, fee - paid)), 'المتبقي']])}${pays.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الإيصال</th></tr>${pays.map(p => `<tr><td>${fmtDate(p.date, false)}</td><td><b>${num(p.amount)}</b> ${st.currency}</td><td class="small">${esc(p.note || p.method || '')}</td><td>${p.receiptUrl ? `<a class="btn sm light" target="_blank" href="${esc(p.receiptUrl)}">📎 عرض</a>` : '—'}</td></tr>`).join('')}</table>` : ''}</div>` : ''}
       <div class="row no-print" style="justify-content:center;margin-top:10px"><button class="btn" id="pprint">🖨️ ${full ? 'طباعة تقرير ' + lbl : 'طباعة'}</button>${t && t.phone ? `<a class="btn wa" target="_blank" href="${waLink(t.phone, 'السلام عليكم أستاذ ' + t.name + '، معك ولي أمر الطالب ' + s.name)}">💬 تواصل مع المعلم</a>` : st.phone ? `<a class="btn wa" target="_blank" href="${waLink(st.phone, 'السلام عليكم، معكم ولي أمر الطالب ' + s.name)}">💬 تواصل مع المجمع</a>` : ''}</div>
       <div id="pprint-area" style="display:none"></div>
       <div class="small muted" style="text-align:center;margin-top:20px">${esc(st.orgName)} — ${esc(st.branchName)} · ${esc(st.complexName)}</div>
@@ -117,7 +117,7 @@ function parentDay(r, subj) {
     const es = ERR.filter(e => e.sub === sub && (!pred || pred(e)));
     if (!es.length) return '';
     let h = `<div class="sub-errs"><div class="small" style="font-weight:700;color:#b4232f">✏️ الأخطاء والتصويب</div>${es.map(e => `<div class="small">${errLine(e)}</div>`).join('')}`;
-    if (rng && es.some(e => e.word && e.s)) { const box = segAyahBoxes(rng, es.filter(e => e.word && e.s)); if (box) h += box.split('class="ayah-box"').join('class="ayah-box" style="font-size:20px;max-height:180px;margin-top:4px"'); }
+    if (rng && es.some(e => e.word && e.s)) { const box = segAyahBoxes(rng, es.filter(e => e.word && e.s)); if (box) h += box.split('class="ayah-box"').join('class="ayah-box" style="font-size:23px;max-height:180px;margin-top:4px"'); }
     return h + '</div>';
   };
   const usedM = new Set(); const mp = sub => { usedM.add(sub); return PF('media') && S.settings.parentShowMedia !== false ? mediaPlayers(r.media, sub) : ''; };
@@ -149,7 +149,7 @@ async function viewRegForm(root) {
   root.innerHTML = `<div class="reg-wrap"><div class="p-hero" style="padding-bottom:60px"><div class="logos"><img src="${logoR()}"><img src="${logoL()}"></div><h1>📝 تسجيل طالب جديد</h1><div class="sub">${esc(st.programName)} — ${esc(st.complexName)}</div></div>
     <div class="reg-card"><p style="margin-top:0;color:var(--teal)">${esc(st.regNote || '')}</p><form id="rf">${STU_FIELDS.map(f => fieldHTML(f, '')).join('')}
       <div class="field" id="agebox" style="display:none"><label>العمر بالتاريخ الميلادي</label><div class="chip gold" id="age"></div></div>
-      <button class="btn block gold" style="font-size:17px;padding:14px" type="submit">✔️ إرسال التسجيل</button></form></div></div>`;
+      <button class="btn block gold" style="font-size:19.5px;padding:14px" type="submit">✔️ إرسال التسجيل</button></form></div></div>`;
   $('#f_birthDate').onchange = e => { const a = ageFrom(e.target.value); $('#agebox').style.display = a !== '' ? '' : 'none'; $('#age').textContent = a + ' سنوات'; };
   $('#rf').onsubmit = async e => {
     e.preventDefault(); const o = readForm($('#rf'));
@@ -161,7 +161,7 @@ async function viewRegForm(root) {
     try {
       if (S.server) { const r = await api('register', { student: o }); if (!r.ok) throw new Error(r.error); }
       else save('students', Object.assign(o, { id: uid('s'), status: 'pending', source: 'form', parentToken: token20(), createdAt: Date.now(), direction: st.directionDefault }));
-      root.innerHTML = `<div class="reg-wrap"><div class="p-hero" style="padding-bottom:60px"><div class="logos"><img src="${logoR()}"><img src="${logoL()}"></div></div><div class="reg-card" style="text-align:center"><div style="font-size:70px">✅</div><h2 style="color:var(--teal)">تم التسجيل بنجاح</h2><p>جزاكم الله خيراً، تم استلام بيانات الطالب <b>${esc(o.name)}</b>.<br>سيتم التواصل معكم وإرسال رابط متابعة ابنكم بعد تفعيل التسجيل.</p><button class="btn light" onclick="location.reload()">تسجيل طالب آخر</button></div></div>`;
+      root.innerHTML = `<div class="reg-wrap"><div class="p-hero" style="padding-bottom:60px"><div class="logos"><img src="${logoR()}"><img src="${logoL()}"></div></div><div class="reg-card" style="text-align:center"><div style="font-size:80.5px">✅</div><h2 style="color:var(--teal)">تم التسجيل بنجاح</h2><p>جزاكم الله خيراً، تم استلام بيانات الطالب <b>${esc(o.name)}</b>.<br>سيتم التواصل معكم وإرسال رابط متابعة ابنكم بعد تفعيل التسجيل.</p><button class="btn light" onclick="location.reload()">تسجيل طالب آخر</button></div></div>`;
     } catch (er) { toast('⚠️ ' + er.message); b.disabled = false; b.textContent = '✔️ إرسال التسجيل'; }
   };
 }
