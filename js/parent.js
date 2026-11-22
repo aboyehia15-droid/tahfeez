@@ -1,5 +1,9 @@
 /* ===================== صفحة الطالب لولي الأمر + نموذج التسجيل ===================== */
 let PV = { k: 'month', f: '', t: '' };
+/* عرض مخصص من رابط الواتساب: يظهر فقط ما اختاره المعلم في الرسالة وللفترة المحددة */
+const PVIEW = (() => { const q = new URLSearchParams(location.search); const v = q.get('v'); if (!v) return null; return { v, o: new Set((q.get('o') || '').split(',').filter(Boolean)), f: q.get('f') || '', t: q.get('t') || '', x: q.get('x') || '' }; })();
+if (PVIEW) { if (PVIEW.f || PVIEW.t) { PV.k = 'custom'; PV.f = PVIEW.f; PV.t = PVIEW.t || PVIEW.f; } else PV.k = 'all'; }
+const PF = k => !PVIEW || PVIEW.o.has(k) || (k === 'far' && PVIEW.o.has('review')) || (k === 'note' && PVIEW.o.has('notes')) || (k === 'grade' && PVIEW.v !== 'daily') || (k === 'media' && PVIEW.v === 'period' && PVIEW.o.has('notes'));
 
 async function viewParent(root, tokenP) {
   root.innerHTML = '<div class="splash"><img src="assets/logo-ibntaymiyah.jpg"><div>جاري تحميل صفحة الطالب…</div></div>';
@@ -31,7 +35,8 @@ function drawParent(root, s) {
   const [from, to] = periodRange(PV.k, todayISO(), PV.f, PV.t);
   const o = statsOf(s.id, from, to); const all = recsOf(s.id); const cumul = allRecsOf(s.id);
   const rk = c && st.parentShowRank !== false ? rankClass(c.id, from, to).find(x => x.s.id === s.id) : null;
-  const lbl = { day: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', custom: 'الفترة المحددة', all: 'منذ البداية' }[PV.k];
+  const lbl = PVIEW && PV.k === 'custom' ? (from === to ? 'يوم ' + fmtDate(from) : 'من ' + fmtDate(from, false) + ' إلى ' + fmtDate(to, false)) : { day: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', custom: 'الفترة المحددة', all: 'منذ البداية' }[PV.k];
+  const V = PVIEW ? PVIEW.v : ''; const full = !PVIEW; const per = V === 'period';
   const today = getRec(s.id, todayISO());
   const memo = memorizedSet(cumul); const prog = surahProgress(memo); const memPages = pagesOfSet(memo);
   const lastNoor = cumul.filter(r => r.noor && r.noor.lesson).pop();
@@ -49,56 +54,60 @@ function drawParent(root, s) {
     <div class="p-hero"><div class="logos"><img src="${logoR()}"><img src="${logoL()}"></div>
       <h1>${esc(s.name)}</h1><div class="sub">🏫 ${esc(c ? c.name : '')}${t ? ' · 👨‍🏫 الأستاذ ' + esc(t.name) : ''} · ${esc(st.programName)}</div></div>
     <div class="p-body">
-      <div class="card no-print" style="padding:8px"><div class="tabs" style="margin:0;justify-content:center">${[['day', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر'], ['all', 'الكل'], ['custom', 'من–إلى']].map(([k, tt]) => `<button data-k="${k}" class="${PV.k === k ? 'on' : ''}">${tt}</button>`).join('')}</div>
+      ${full ? '' : `<div class="card" style="text-align:center;padding:10px"><b style="color:var(--teal);font-size:16px">${V === 'exam' ? '📝 نتيجة الاختبار' : V === 'fee' ? '💰 بيان الرسوم' : V === 'absent' ? '📅 الحضور والغياب' : '📅 تقرير ' + lbl}</b></div>`}<div class="card no-print" style="padding:8px;${full ? '' : 'display:none'}"><div class="tabs" style="margin:0;justify-content:center">${[['day', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر'], ['all', 'الكل'], ['custom', 'من–إلى']].map(([k, tt]) => `<button data-k="${k}" class="${PV.k === k ? 'on' : ''}">${tt}</button>`).join('')}</div>
         ${PV.k === 'custom' ? `<div class="row" style="justify-content:center;margin-top:8px"><input type="date" class="inp" id="pf" value="${from}" style="width:auto"> إلى <input type="date" class="inp" id="pt" value="${to}" style="width:auto"></div>` : ''}</div>
-      <div class="grid g3">
-        ${f.quran && subj.includes('quran') ? `<div class="stat"><span class="i">📖</span><div class="n">${num(o.hifz)}</div><div class="l">وجه حفظ ${lbl}</div></div><div class="stat"><span class="i">🔁</span><div class="n">${num(o.reviewAll)}</div><div class="l">وجه مراجعة ${lbl}${o.far ? ` <small>(بعيدة ${num(o.far)})</small>` : ''}</div></div>` : ''}
-        <div class="stat"><span class="i">📅</span><div class="n">${o.days ? o.attPct + '%' : '—'}</div><div class="l">الحضور (${o.p + o.l}/${o.days})${o.a ? ` · <b style="color:var(--red)">غياب ${o.a}</b>` : ''}</div></div>
-        ${rk ? `<div class="stat"><span class="i">🏆</span><div class="n">${rk.rank}<small style="font-size:14px;color:var(--muted)"> / ${studentsOfClass(c.id).length}</small></div><div class="l">الترتيب في الفصل</div></div>` : ''}
-        <div class="stat"><span class="i">🎖️</span><div class="n" style="font-size:20px">${levelOf(o)}</div><div class="l">المستوى العام</div></div>
-        <div class="stat"><span class="i">⭐</span><div class="n">${o.points}</div><div class="l">النقاط</div></div>
+      <div class="grid g3" style="${full || per ? '' : 'display:none'}">
+        ${f.quran && subj.includes('quran') && (full || PF('hifz') || PF('review')) ? `<div class="stat"><span class="i">📖</span><div class="n">${num(o.hifz)}</div><div class="l">وجه حفظ ${lbl}</div></div><div class="stat"><span class="i">🔁</span><div class="n">${num(o.reviewAll)}</div><div class="l">وجه مراجعة ${lbl}${o.far ? ` <small>(بعيدة ${num(o.far)})</small>` : ''}</div></div>` : ''}
+        ${full || PF('att') ? `<div class="stat"><span class="i">📅</span><div class="n">${o.days ? o.attPct + '%' : '—'}</div><div class="l">الحضور (${o.p + o.l}/${o.days})${o.a ? ` · <b style="color:var(--red)">غياب ${o.a}</b>` : ''}</div></div>` : ''}
+        ${rk && (full || PF('rank')) ? `<div class="stat"><span class="i">🏆</span><div class="n">${rk.rank}<small style="font-size:14px;color:var(--muted)"> / ${studentsOfClass(c.id).length}</small></div><div class="l">الترتيب في الفصل</div></div>` : ''}
+        ${full || PF('level') ? `<div class="stat"><span class="i">🎖️</span><div class="n" style="font-size:20px">${levelOf(o)}</div><div class="l">المستوى العام</div></div>` : ''}
+        ${full ? `<div class="stat"><span class="i">⭐</span><div class="n">${o.points}</div><div class="l">النقاط</div></div>` : ''}
       </div>
-      ${today ? `<div class="card" style="margin-top:14px;border:2px solid var(--gold)"><h3>📌 تسجيل اليوم — ${fmtDate(todayISO())}</h3>${parentDay(today, subj)}</div>` : ''}
-      ${f.quran && subj.includes('quran') ? `<div class="card" style="margin-top:14px"><h3>📖 خريطة الحفظ</h3>
+      ${f.quran && subj.includes('quran') && (full || (per && PF('surahs'))) ? `<div class="card" style="margin-top:14px"><h3>📖 خريطة الحفظ</h3>
         <div class="row" style="margin-bottom:10px"><div style="flex:1"><div class="small muted">المحفوظ من المصحف: <b style="color:var(--teal)">${num(memPages, 1)} وجه</b> من 604 (${num(memPages / 604 * 100, 1)}%)</div><div class="prog" style="margin-top:4px"><i style="width:${Math.max(1, memPages / 604 * 100)}%"></i></div></div></div>
         <div class="small muted" style="margin-bottom:6px">جزء عمّ:</div>
         <div class="surah-map">${Array.from({ length: 37 }, (_, i) => 114 - i).map(n => { const p = prog[n - 1]; return `<div class="${p >= 1 ? 'done' : p > 0 ? 'part' : ''}">${Q.names[n - 1]}${p > 0 && p < 1 ? `<i style="width:${p * 100}%"></i>` : ''}</div>`; }).join('')}</div>
         ${prog.slice(0, 77).some(p => p > 0) ? `<div class="small" style="margin-top:8px"><b>سور أخرى:</b> ${prog.slice(0, 77).map((p, i) => p > 0 ? Q.names[i] + (p < 1 ? ' (' + Math.round(p * 100) + '%)' : ' ✓') : '').filter(Boolean).join('، ')}</div>` : ''}</div>` : ''}
-      ${subj.filter(isCur).map(cid => curParentCard(s, cid)).join('')}
-      ${f.noor && subj.includes('noor') ? `<div class="card"><h3>🔤 القاعدة النورانية</h3>${lastNoor ? `<div style="margin-bottom:8px">وصل إلى: <b>${esc(NOORANIA[lastNoor.noor.lesson - 1].title)}</b>${lastNoor.noor.to ? ` — البند «<span style="font-family:var(--quran);font-size:20px">${esc(NOORANIA[lastNoor.noor.lesson - 1].items[Math.max(lastNoor.noor.from, lastNoor.noor.to) - 1] || '')}</span>»` : ''}</div>` : '<div class="muted small">لم يبدأ بعد</div>'}
+      ${full || (per && PF('cur')) ? subj.filter(isCur).map(cid => curParentCard(s, cid)).join('') : ''}
+      ${f.noor && subj.includes('noor') && (full || (per && PF('noor'))) ? `<div class="card"><h3>🔤 القاعدة النورانية</h3>${lastNoor ? `<div style="margin-bottom:8px">وصل إلى: <b>${esc(NOORANIA[lastNoor.noor.lesson - 1].title)}</b>${lastNoor.noor.to ? ` — البند «<span style="font-family:var(--quran);font-size:20px">${esc(NOORANIA[lastNoor.noor.lesson - 1].items[Math.max(lastNoor.noor.from, lastNoor.noor.to) - 1] || '')}</span>»` : ''}</div>` : '<div class="muted small">لم يبدأ بعد</div>'}
         <div class="noor-path">${NOORANIA.map((l, i) => `<span class="${lastNoor ? (i + 1 < lastNoor.noor.lesson ? 'done' : i + 1 === lastNoor.noor.lesson ? 'cur' : '') : ''}" title="${esc(l.title)}">${i + 1}</span>`).join('')}</div></div>` : ''}
-      ${f.zad && subj.includes('zad') ? `<div class="card"><h3>🌸 زاد الطفل المسلم</h3><div class="badges">${zadCurriculum().map(z => { const got = [...new Set(zadAll.filter(x => x.cat === z.id).map(x => x.item))]; return `<div class="badge-it" style="border-color:${got.length ? z.color : ''}"><span class="e">${z.icon}</span><b>${esc(z.name)}</b><div>${got.length} / ${z.items.length}</div></div>`; }).join('')}</div>
+      ${f.zad && subj.includes('zad') && (full || (per && PF('zad'))) ? `<div class="card"><h3>🌸 زاد الطفل المسلم</h3><div class="badges">${zadCurriculum().map(z => { const got = [...new Set(zadAll.filter(x => x.cat === z.id).map(x => x.item))]; return `<div class="badge-it" style="border-color:${got.length ? z.color : ''}"><span class="e">${z.icon}</span><b>${esc(z.name)}</b><div>${got.length} / ${z.items.length}</div></div>`; }).join('')}</div>
         ${zadAll.length ? `<div class="small" style="margin-top:10px;line-height:2">${zadCurriculum().map(z => { const got = [...new Set(zadAll.filter(x => x.cat === z.id).map(x => x.item))]; return got.length ? `<b>${z.icon} ${esc(z.name)}:</b> ${got.map(esc).join('، ')}` : ''; }).filter(Boolean).join('<br>')}</div>` : ''}</div>` : ''}
-      ${S.settings.parentShowExams !== false ? parentExamsCard(s) : ''}
-      <div class="card"><h3>📅 الحضور — ${MONTHS[parseISO(m1).getMonth()]}</h3><div class="cal">${cal}</div><div class="row small" style="margin-top:8px"><span class="chip green">حاضر</span><span class="chip red">غائب</span><span class="chip gold">متأخر</span><span class="chip blue">مستأذن</span></div></div>
-      <div class="card"><h3>🗒️ السجل اليومي — ${lbl}</h3><div class="timeline">${timeline.length ? timeline.map(r => `<div class="ti"><div class="dt">${fmtDate(r.date)} <span class="small muted">${hijri(r.date)}</span></div>${parentDay(r, subj)}</div>`).join('') : '<div class="empty small">لا توجد تسجيلات في هذه الفترة</div>'}</div></div>
-      ${f.fees && st.parentShowFees !== false && (fee > 0 || (st.parentShowDisc && (s.feeExempt || discountsOf(s).total))) ? `<div class="card"><h3>💰 الرسوم</h3>${s.feeExempt && st.parentShowDisc ? '<div class="chip gray" style="font-size:14px;padding:8px 14px">🎓 الطالب معفى من الرسوم</div>' : ''}${st.parentShowDisc && discountsOf(s).total && !s.feeExempt ? `<div class="small" style="margin-bottom:8px">الرسوم الأساسية ${num(discountsOf(s).base)} ${st.currency}${discountsOf(s).sib ? ' — خصم الأخوة ' + num(discountsOf(s).sib) : ''}${discountsOf(s).spec ? ' — خصم خاص ' + num(discountsOf(s).spec) : ''}</div>` : ''}${s.feeExempt ? '' : kpis([[num(fee), st.parentShowDisc && discountsOf(s).total ? 'المستحق بعد الخصم' : 'الرسوم المقررة'], [num(paid), 'المسدد'], [num(Math.max(0, fee - paid)), 'المتبقي']])}${pays.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الإيصال</th></tr>${pays.map(p => `<tr><td>${fmtDate(p.date, false)}</td><td><b>${num(p.amount)}</b> ${st.currency}</td><td class="small">${esc(p.note || p.method || '')}</td><td>${p.receiptUrl ? `<a class="btn sm light" target="_blank" href="${esc(p.receiptUrl)}">📎 عرض</a>` : '—'}</td></tr>`).join('')}</table>` : ''}</div>` : ''}
-      <div class="row no-print" style="justify-content:center;margin-top:10px"><button class="btn" id="pprint">🖨️ طباعة تقرير ${lbl}</button>${t && t.phone ? `<a class="btn wa" target="_blank" href="${waLink(t.phone, 'السلام عليكم أستاذ ' + t.name + '، معك ولي أمر الطالب ' + s.name)}">💬 تواصل مع المعلم</a>` : st.phone ? `<a class="btn wa" target="_blank" href="${waLink(st.phone, 'السلام عليكم، معكم ولي أمر الطالب ' + s.name)}">💬 تواصل مع المجمع</a>` : ''}</div>
+      ${S.settings.parentShowExams !== false && (full || V === 'exam' || (per && PF('exams'))) ? parentExamsCard(s, V === 'exam' ? PVIEW.x : '', full || V === 'exam' ? '' : from, full || V === 'exam' ? '' : to) : ''}
+      ${full || V === 'absent' || (per && PF('att')) ? `<div class="card"><h3>📅 الحضور — ${MONTHS[parseISO(m1).getMonth()]}</h3><div class="cal">${cal}</div><div class="row small" style="margin-top:8px"><span class="chip green">حاضر</span><span class="chip red">غائب</span><span class="chip gold">متأخر</span><span class="chip blue">مستأذن</span></div></div>` : ''}
+      ${full || V === 'daily' || per ? `<div class="card"><h3>🗒️ ${V === 'daily' ? 'ما تم تسجيله' : 'السجل اليومي — ' + lbl}</h3><div class="timeline">${timeline.length ? timeline.map(r => `<div class="ti"><div class="dt">${fmtDate(r.date)} <span class="small muted">${hijri(r.date)}</span></div>${parentDay(r, subj)}</div>`).join('') : '<div class="empty small">لا توجد تسجيلات في هذه الفترة</div>'}</div></div>` : ''}
+      ${f.fees && st.parentShowFees !== false && (full || V === 'fee' || (per && PF('fees'))) && (fee > 0 || (st.parentShowDisc && (s.feeExempt || discountsOf(s).total))) ? `<div class="card"><h3>💰 الرسوم</h3>${s.feeExempt && st.parentShowDisc ? '<div class="chip gray" style="font-size:14px;padding:8px 14px">🎓 الطالب معفى من الرسوم</div>' : ''}${st.parentShowDisc && discountsOf(s).total && !s.feeExempt ? `<div class="small" style="margin-bottom:8px">الرسوم الأساسية ${num(discountsOf(s).base)} ${st.currency}${discountsOf(s).sib ? ' — خصم الأخوة ' + num(discountsOf(s).sib) : ''}${discountsOf(s).spec ? ' — خصم خاص ' + num(discountsOf(s).spec) : ''}</div>` : ''}${s.feeExempt ? '' : kpis([[num(fee), st.parentShowDisc && discountsOf(s).total ? 'المستحق بعد الخصم' : 'الرسوم المقررة'], [num(paid), 'المسدد'], [num(Math.max(0, fee - paid)), 'المتبقي']])}${pays.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الإيصال</th></tr>${pays.map(p => `<tr><td>${fmtDate(p.date, false)}</td><td><b>${num(p.amount)}</b> ${st.currency}</td><td class="small">${esc(p.note || p.method || '')}</td><td>${p.receiptUrl ? `<a class="btn sm light" target="_blank" href="${esc(p.receiptUrl)}">📎 عرض</a>` : '—'}</td></tr>`).join('')}</table>` : ''}</div>` : ''}
+      <div class="row no-print" style="justify-content:center;margin-top:10px"><button class="btn" id="pprint">🖨️ ${full ? 'طباعة تقرير ' + lbl : 'طباعة'}</button>${t && t.phone ? `<a class="btn wa" target="_blank" href="${waLink(t.phone, 'السلام عليكم أستاذ ' + t.name + '، معك ولي أمر الطالب ' + s.name)}">💬 تواصل مع المعلم</a>` : st.phone ? `<a class="btn wa" target="_blank" href="${waLink(st.phone, 'السلام عليكم، معكم ولي أمر الطالب ' + s.name)}">💬 تواصل مع المجمع</a>` : ''}</div>
       <div id="pprint-area" style="display:none"></div>
       <div class="small muted" style="text-align:center;margin-top:20px">${esc(st.orgName)} — ${esc(st.branchName)} · ${esc(st.complexName)}</div>
     </div></div>`;
   $$('[data-k]', root).forEach(b => b.onclick = () => { PV.k = b.dataset.k; drawParent(root, s); });
   const pf = $('#pf', root); if (pf) { pf.onchange = e => { PV.f = e.target.value; PV.t = $('#pt').value; drawParent(root, s); }; $('#pt').onchange = e => { PV.t = e.target.value; PV.f = $('#pf').value; drawParent(root, s); }; }
-  $('#pprint').onclick = () => { const a = $('#pprint-area'); a.innerHTML = `<div class="report">${studentReport(s, from, to, lbl + (from ? ' — من ' + fmtDate(from, false) + ' إلى ' + fmtDate(to, false) : ''), { quran: subj.includes('quran'), noor: subj.includes('noor'), zad: subj.includes('zad'), att: 1, notes: 1, fees: 0 })}</div>`; a.id = 'pp'; printEl('#pp'); a.id = 'pprint-area'; };
+  $('#pprint').onclick = () => { if (!full) return window.print(); const a = $('#pprint-area'); a.innerHTML = `<div class="report">${studentReport(s, from, to, lbl + (from ? ' — من ' + fmtDate(from, false) + ' إلى ' + fmtDate(to, false) : ''), { quran: subj.includes('quran'), noor: subj.includes('noor'), zad: subj.includes('zad'), att: 1, notes: 1, fees: 0 })}</div>`; a.id = 'pp'; printEl('#pp'); a.id = 'pprint-area'; };
 }
 function parentDay(r, subj) {
-  if (r.att === 'a') return '<div class="ln"><span class="chip red">غائب</span></div>' + (r.note ? `<div class="ln">📝 ${esc(r.note)}</div>` : '');
+  const gc = g => PF('grade') ? gradeChip(g) : '';
+  const note = r.note && PF('note') ? `<div style="background:#fffbea;border-radius:10px;padding:6px 10px;margin-top:4px">📝 <b>ملاحظة المعلم:</b> ${esc(r.note)}</div>` : '';
+  if (r.att === 'a') return '<div class="ln"><span class="chip red">غائب</span></div>' + (note ? `<div class="ln">${note}</div>` : '');
   if (r.att === 'e') return '<div class="ln"><span class="chip blue">مستأذن</span></div>';
   const L = [];
-  if (r.att === 'l') L.push('<span class="chip gold">متأخر</span>');
-  if (r.hifz && r.hifz.s1) L.push(`📖 <b>الحفظ:</b> ${Q.rangeText(r.hifz)} <span class="muted">(${num(r.hifz.pages)} وجه)</span> ${gradeChip(r.hifz.grade)}`);
-  if (r.review && r.review.s1) L.push(`🔁 <b>المراجعة:</b> ${Q.rangeText(r.review)} <span class="muted">(${num(r.review.pages)} وجه)</span> ${gradeChip(r.review.grade)}`);
-  if (r.far && r.far.s1) L.push(`🕰️ <b>المراجعة البعيدة:</b> ${Q.rangeText(r.far)} <span class="muted">(${num(r.far.pages)} وجه)</span> ${gradeChip(r.far.grade)}`);
-  Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (!c || !x || !x.lesson) return; const Ls = c.lessons[x.lesson - 1] || { items: [] }; L.push(`${c.icon} <b>${esc(c.name)}:</b> ${esc(Ls.t || '')} ${gradeChip(x.grade)}${(x.items || []).length ? `<div class="small" style="color:#2c7a28">✔️ ${x.items.map(i => esc(Ls.items[i])).join('، ')}</div>` : ''}${(x.errs || []).length ? `<div class="small" style="color:var(--red)">📌 يحتاج تدريباً: ${x.errs.map(i => esc(Ls.items[i])).join('، ')}</div>` : ''}`); });
-  if (r.noor && r.noor.lesson) { const N = NOORANIA[r.noor.lesson - 1]; L.push(`🔤 <b>النورانية:</b> ${esc(N.title)}${r.noor.from ? ` <span class="muted">(من «${esc(N.items[r.noor.from - 1] || '')}» إلى «${esc(N.items[r.noor.to - 1] || '')}»)</span>` : ''} ${gradeChip(r.noor.grade)}`); }
-  (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat) || {}; L.push(`${c.icon || '🌸'} <b>${esc(c.name || '')}:</b> ${esc(z.item)} ${gradeChip(z.grade)}`); });
-  if (r.behavior) L.push('السلوك: ' + stars(r.behavior));
-  if (r.errors && r.errors.length) {
-    L.push(`<div style="margin-top:4px"><b>✏️ الأخطاء والتصويب:</b>${r.errors.map(e => `<div class="small" style="padding:3px 0">${errText(e)}</div>`).join('')}</div>`);
-    ['hifz', 'review', 'far'].forEach(k => { const errs = r.errors.filter(e => e.sub === k && e.word); if (errs.length && r[k]) { const box = ayahBoxHTML(r[k], errs); if (box) L.push(box.replace('class="ayah-box"', 'class="ayah-box" style="font-size:20px;max-height:200px"')); } });
+  if (r.att === 'l' && PF('att')) L.push('<span class="chip gold">متأخر</span>');
+  if (PF('hifz') && r.hifz && r.hifz.s1) L.push(`📖 <b>الحفظ:</b> ${Q.rangeText(r.hifz)} <span class="muted">(${num(r.hifz.pages)} وجه)</span> ${gc(r.hifz.grade)}`);
+  if (PF('review') && r.review && r.review.s1) L.push(`🔁 <b>المراجعة:</b> ${Q.rangeText(r.review)} <span class="muted">(${num(r.review.pages)} وجه)</span> ${gc(r.review.grade)}`);
+  if (PF('far') && r.far && r.far.s1) L.push(`🕰️ <b>المراجعة البعيدة:</b> ${Q.rangeText(r.far)} <span class="muted">(${num(r.far.pages)} وجه)</span> ${gc(r.far.grade)}`);
+  if (PF('cur')) Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (!c || !x || !x.lesson) return; const Ls = c.lessons[x.lesson - 1] || { items: [] }; L.push(`${c.icon} <b>${esc(c.name)}:</b> ${esc(Ls.t || '')} ${gc(x.grade)}${(x.items || []).length ? `<div class="small" style="color:#2c7a28">✔️ ${x.items.map(i => esc(Ls.items[i])).join('، ')}</div>` : ''}${(x.errs || []).length && PF('errors') ? `<div class="small" style="color:var(--red)">📌 يحتاج تدريباً: ${x.errs.map(i => esc(Ls.items[i])).join('، ')}</div>` : ''}`); });
+  if (PF('noor') && r.noor && r.noor.lesson) { const N = NOORANIA[r.noor.lesson - 1]; L.push(`🔤 <b>النورانية:</b> ${esc(N.title)}${r.noor.from ? ` <span class="muted">(من «${esc(N.items[r.noor.from - 1] || '')}» إلى «${esc(N.items[r.noor.to - 1] || '')}»)</span>` : ''} ${gc(r.noor.grade)}`); }
+  if (PF('zad')) (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat) || {}; L.push(`${c.icon || '🌸'} <b>${esc(c.name || '')}:</b> ${esc(z.item)} ${gc(z.grade)}`); });
+  if (PF('behavior') && r.behavior) L.push('السلوك: ' + stars(r.behavior));
+  if (PF('errors') && r.errors && r.errors.length) {
+    const shown = r.errors.filter(e => (e.sub !== 'noor' || PF('noor')) && (!['hifz', 'review', 'far'].includes(e.sub) || PF(e.sub)));
+    if (shown.length) {
+      L.push(`<div style="margin-top:4px"><b>✏️ الأخطاء والتصويب:</b>${shown.map(e => `<div class="small" style="padding:3px 0">${errText(e)}</div>`).join('')}</div>`);
+      ['hifz', 'review', 'far'].forEach(k => { if (!PF(k)) return; const errs = shown.filter(e => e.sub === k && e.word); if (errs.length && r[k]) { const box = ayahBoxHTML(r[k], errs); if (box) L.push(box.replace('class="ayah-box"', 'class="ayah-box" style="font-size:20px;max-height:200px"')); } });
+    }
   }
-  if (S.settings.parentShowMedia !== false && (r.media || []).some(x => x.share)) L.push(mediaPlayers(r.media));
-  if (r.note) L.push(`<div style="background:#fffbea;border-radius:10px;padding:6px 10px;margin-top:4px">📝 <b>ملاحظة المعلم:</b> ${esc(r.note)}</div>`);
+  if (PF('media') && S.settings.parentShowMedia !== false && (r.media || []).some(x => x.share)) L.push(mediaPlayers(r.media));
+  if (note) L.push(note);
   return L.map(x => `<div class="ln">${x}</div>`).join('') || '<div class="ln"><span class="chip green">حاضر</span></div>';
 }
 

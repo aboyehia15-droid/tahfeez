@@ -4,7 +4,7 @@ const WA_KINDS = {
   parent: { title: '🔗 إرسال رابط صفحة الطالب', opts: [['greet', 'التحية والتعريف بالصفحة', 1], ['class', 'اسم الفصل والمعلم', 0], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
   daily: { title: '📖 تقرير اليوم', opts: [['att', 'الحضور', 1], ['hifz', 'الحفظ', 1], ['review', 'المراجعة', 1], ['far', 'المراجعة البعيدة', 1], ['noor', 'النورانية', 1], ['zad', 'زاد الطفل', 1], ['cur', 'المناهج (الحروف والأرقام…)', 1], ['grade', 'التقديرات', 1], ['errors', 'الأخطاء والتصويب', 1], ['behavior', 'السلوك', 0], ['note', 'ملاحظة المعلم', 1], ['media', 'روابط التسجيلات المختارة', 1], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
   absent: { title: '❌ إشعار الغياب', opts: [['date', 'تاريخ الغياب', 1], ['count', 'عدد أيام الغياب هذا الشهر', 0], ['ask', 'طلب الحرص على الحضور', 1], ['link', 'رابط صفحة الطالب', 0], ['sign', 'توقيع المجمع', 1]] },
-  period: { title: '📊 تقرير الفترة', opts: [['hifz', 'أوجه الحفظ', 1], ['review', 'أوجه المراجعة', 1], ['surahs', 'السور التي حفظها', 0], ['att', 'الحضور والغياب', 1], ['rank', 'الترتيب في الفصل', 1], ['level', 'المستوى العام', 1], ['cur', 'التقدم في المناهج', 0], ['exams', 'نتائج الاختبارات', 0], ['fees', 'المتبقي من الرسوم', 0], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
+  period: { title: '📊 تقرير الفترة', opts: [['hifz', 'الحفظ', 1], ['review', 'المراجعة', 1], ['surahs', 'السور التي حفظها', 0], ['noor', 'النورانية', 0], ['zad', 'زاد الطفل', 0], ['att', 'الحضور والغياب', 1], ['notes', 'ملاحظات المعلم', 1], ['errors', 'الأخطاء والتصويب', 0], ['rank', 'الترتيب في الفصل', 1], ['level', 'المستوى العام', 1], ['cur', 'التقدم في المناهج', 0], ['exams', 'نتائج الاختبارات', 0], ['fees', 'المتبقي من الرسوم', 0], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
   exam: { title: '📝 نتيجة الاختبار', opts: [['subjects', 'درجة كل مادة', 1], ['total', 'المجموع', 1], ['pct', 'النسبة', 0], ['grade', 'التقدير', 1], ['rank', 'الترتيب في الفصل', 0], ['notes', 'ملاحظة المعلم', 1], ['quran', 'ملخص أخطاء القرآن', 0], ['media', 'روابط تسجيلات الاختبار المختارة', 0], ['link', 'رابط صفحة الطالب (التفاصيل)', 1], ['sign', 'توقيع المجمع', 1]] },
   fee: { title: '💰 تذكير الرسوم', opts: [['due', 'الرسوم المستحقة', 0], ['disc', 'الخصم أو الإعفاء', 0], ['paid', 'المسدد', 1], ['remaining', 'المتبقي', 1], ['pays', 'تفاصيل الدفعات', 0], ['link', 'رابط صفحة الطالب', 0], ['sign', 'توقيع المجمع', 1]] }
 };
@@ -46,6 +46,9 @@ function waBuild(kind, s, ctx, o) {
     if (o.review) L.push(`🔁 المراجعة: ${num(x.reviewAll)} وجه`);
     if (o.surahs) { const pr = surahProgress(memorizedSet(allRecsOf(s.id))); const d = pr.map((p, i) => p >= 1 ? Q.names[i] : '').filter(Boolean); if (d.length) L.push('🕌 السور المحفوظة: ' + d.join('، ')); }
     if (o.att) L.push(`📅 الحضور: ${x.p + x.l} من ${x.days}${x.a ? ' — الغياب: ' + x.a : ''}`);
+    if (o.noor) { const ln = x.recs.filter(r => r.noor && r.noor.lesson).pop(); if (ln) L.push('🔤 النورانية: ' + NOORANIA[ln.noor.lesson - 1].title); }
+    if (o.zad && x.zad) L.push(`🌸 زاد الطفل: ${x.zad} بنداً`);
+    if (o.errors && x.errors) L.push(`✏️ الأخطاء: ${x.errors} (صُوّب ${x.fixed})`);
     if (o.rank) { const c = classOf(s); const rk = c ? rankClass(c.id, ctx.from, ctx.to).find(y => y.s.id === s.id) : null; if (rk) L.push(`🏆 الترتيب: ${rk.rank} من ${studentsOfClass(c.id).length}`); }
     if (o.level) L.push('🎖️ المستوى: ' + levelOf(x).replace(/^\S+\s/, ''));
     if (o.cur) classSubjects(classOf(s)).filter(isCur).forEach(cid => { const c = curById(cid); const p = curProgress(s.id, cid); if (p.last) L.push(`${c.icon} ${c.name}: ${c.lessons[p.last.lesson - 1].t} (${Math.round(p.pct * 100)}%)`); });
@@ -77,7 +80,11 @@ function waBuild(kind, s, ctx, o) {
     if (o.remaining) L.push(`المتبقي: ${num(Math.max(0, f - p))} ${st.currency}`);
   }
   if (o.extra) L.push(o.extra);
-  if (o.link && features().parentPage) L.push((kind === 'parent' ? '🔗 رابط صفحة ابنكم:\n' : 'للتفاصيل:\n') + parentLink(ensureToken(s)));
+  if (o.link && features().parentPage) {
+    const sel = Object.keys(o).filter(k => o[k] && !['link', 'sign', 'greet', 'extra', 'class'].includes(k)).join(',');
+    const view = kind === 'parent' ? null : kind === 'daily' ? { v: 'daily', o: sel, f: ctx.date, t: ctx.date } : kind === 'absent' ? { v: 'absent', o: sel, f: monthRange(ctx.date)[0], t: monthRange(ctx.date)[1] } : kind === 'period' ? { v: 'period', o: sel, f: ctx.from, t: ctx.to } : kind === 'exam' ? { v: 'exam', o: sel, x: ctx.ex.id } : { v: 'fee', o: sel };
+    L.push((kind === 'parent' ? '🔗 رابط صفحة ابنكم:\n' : '📄 التفاصيل:\n') + parentLink(ensureToken(s), view));
+  }
   if (o.sign) L.push(`جزاكم الله خيراً\n${st.complexName}`);
   return L.filter(Boolean).join('\n');
 }

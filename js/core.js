@@ -84,7 +84,7 @@ function waLink(phone, text) { return 'https://wa.me/' + normPhone(phone) + '?te
 function fillTpl(tpl, vars) { const st = S.settings; const all = Object.assign({ complex: st.complexName, program: st.programName, org: st.orgName, currency: st.currency }, vars); return String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => all[k] != null ? all[k] : m); }
 function appBase() { return location.origin + location.pathname.replace(/index\.html$/, ''); }
 const regLink = () => appBase() + '?reg=1' + (S.server ? '&s=' + encodeURIComponent(S.server) : '');
-const parentLink = st => appBase() + '?p=' + st.parentToken + (S.server ? '&s=' + encodeURIComponent(S.server) : '');
+const parentLink = (st, view) => appBase() + '?p=' + st.parentToken + (view ? '&' + new URLSearchParams(Object.fromEntries(Object.entries(view).filter(([, v]) => v != null && v !== ''))).toString() : '') + (S.server ? '&s=' + encodeURIComponent(S.server) : '');
 
 /* ——— الوصول للبيانات ——— */
 /* ——— الأعوام الدراسية: كل عام يغطي فترة تواريخ، والأعوام المغلقة تُعرض للاطلاع فقط ——— */
