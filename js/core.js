@@ -41,6 +41,8 @@ function loadLocal() {
   try { S.data = JSON.parse(localStorage.getItem(LS.data) || '{}'); } catch (e) { S.data = {}; }
   TABLE_NAMES.forEach(t => { if (!Array.isArray(S.data[t])) S.data[t] = []; });
   try { const s = JSON.parse(localStorage.getItem(LS.sess) || 'null'); if (s) { S.me = s.me; S.token = s.token; } } catch (e) {}
+  // من دخل الوضع المحلي بالخطأ ولا توجد عنده بيانات محلية حقيقية: يرجع تلقائياً إلى خادم المجمع
+  if (localStorage.getItem('tz_local') && window.DEFAULT_SERVER && !localStorage.getItem(LS.server) && (!S.data.students.length || (S.token && S.me)) && !/[?&]local=1/.test(location.search) && !/^(localhost|127\.)/.test(location.hostname)) { localStorage.removeItem('tz_local'); if (!S.token) { S.me = null; } }
   S.server = localStorage.getItem(LS.server) || (localStorage.getItem('tz_local') ? '' : (window.DEFAULT_SERVER || ''));
 }
 let _persistT;

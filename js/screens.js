@@ -23,7 +23,7 @@ function shell(active) {
       <nav class="nav">${nav.map(n => `<a href="#/${n.k}" class="${active === n.k ? 'on' : ''}"><span class="ic">${n.ic}</span>${n.t}${n.badge ? `<span class="badge">${n.badge}</span>` : ''}</a>`).join('')}${installNavItem()}
       <a href="#" id="logout-lnk" style="margin-top:20px;opacity:.8"><span class="ic">🚪</span>${isLocal() ? 'وضع محلي' : 'تسجيل الخروج'}</a></nav></aside>
     <div class="main">
-      ${isLocal() ? `<div class="mode-banner no-print">💾 يعمل التطبيق الآن على هذا الجهاز فقط. ليصل المعلمون وأولياء الأمور من أجهزتهم <a href="#/settings/server">اربطه بالخادم من هنا</a></div>` : ''}
+      ${isLocal() ? `<div class="mode-banner no-print">💾 يعمل التطبيق الآن على هذا الجهاز فقط. ليصل المعلمون وأولياء الأمور من أجهزتهم ${window.DEFAULT_SERVER ? '<button class="btn sm" style="margin:4px 6px 0" onclick="reconnectServer()">🔗 الربط بخادم المجمع الآن</button>' : '<a href="#/settings/server">اربطه بالخادم من هنا</a>'}</div>` : ''}
       ${viewingArchive() ? `<div class="mode-banner no-print" style="background:#e4ecfb;color:#24427e">🔒 تعرض الآن بيانات العام الدراسي <b>${esc(S.viewYear)}</b> (مغلق — للعرض والتقارير فقط) <a href="#" id="back-year" style="color:#24427e">↩️ العودة للعام الحالي ${esc(curYear())}</a></div>` : ''}
       <div class="topbar"><div><h1>${esc(st.programName)} <button class="chip gold" id="year-chip" style="border:0;cursor:pointer;font-size:14px;vertical-align:middle">📅 ${esc(S.viewYear || curYear())}${viewingArchive() ? ' 🔒' : ''}</button></h1><div class="who">${S.me ? '👤 ' + esc(S.me.name) + ' · ' : ''}<span id="sync-st"></span></div></div>
         ${fsBtn()}<div class="logos"><img src="${logoR()}" alt="جمعية تعلم"><img src="${logoL()}" alt="مجمع ابن تيمية"></div></div>
@@ -740,11 +740,11 @@ function viewLogin(root) {
   root.innerHTML = `<div class="login"><div class="box"><div class="lg"><img src="${logoR()}"><img src="${logoL()}"></div><h2 style="color:var(--teal);margin:6px 0">منصة متابعة الحلقات</h2><p class="muted small">${esc(S.settings.complexName)}</p>
     <input class="inp" id="lu" placeholder="اسم المستخدم (رقم جوالك)" dir="ltr" autocapitalize="off" autocorrect="off" autocomplete="username" inputmode="text" style="margin-bottom:8px"><div style="position:relative;margin-bottom:12px"><input class="inp" id="lp" type="password" placeholder="كلمة المرور" dir="ltr" autocapitalize="off" autocorrect="off" autocomplete="current-password"><button type="button" id="lpe" title="إظهار كلمة المرور" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:20px;cursor:pointer">👁️</button></div><div id="lerr" hidden style="color:var(--red);font-size:15px;margin:-4px 0 10px;text-align:center"></div><button class="btn block" id="lb">دخول</button>
     ${isStandalone() ? '' : '<button class="btn light block" style="margin-top:8px" onclick="installNow()">📲 تثبيت التطبيق على جهازك</button>'}
-    <button class="btn ghost block" id="lx" style="margin-top:8px;font-size:14px">العمل محلياً بدون خادم</button></div></div>`;
+    ${URLQ.get('local') ? '<button class="btn ghost block" id="lx" style="margin-top:8px;font-size:14px">العمل محلياً بدون خادم</button>' : ''}</div></div>`;
   const go = async () => { const b = $('#lb'); b.disabled = true; b.textContent = '⏳'; try { const r = await api('login', { username: $('#lu').value.trim(), password: $('#lp').value }); if (!r.ok) throw new Error(r.error); S.token = r.token; S.me = r.user; saveSession(); await pull(true); location.hash = '#/home'; render(); } catch (e) { const msg = e instanceof TypeError ? 'تعذر الاتصال بالخادم — تحقق من الإنترنت ثم أعد المحاولة' : e.message; toast('⚠️ ' + msg, 4000); const le = $('#lerr'); if (le) { le.textContent = '⚠️ ' + msg; le.hidden = false; } } b.disabled = false; b.textContent = 'دخول'; };
   $('#lb').onclick = go; $('#lp').onkeydown = e => e.key === 'Enter' && go();
   $('#lpe').onclick = () => { const p = $('#lp'); p.type = p.type === 'password' ? 'text' : 'password'; };
-  $('#lx').onclick = async () => { if (await confirmBox('فصل الربط بالخادم والعمل محلياً على هذا الجهاز؟', 'نعم', false)) { localStorage.removeItem(LS.server); localStorage.setItem('tz_local', '1'); S.server = ''; render(); } };
+  if ($('#lx')) $('#lx').onclick = async () => { if (await confirmBox('فصل الربط بالخادم والعمل محلياً على هذا الجهاز؟', 'نعم', false)) { localStorage.removeItem(LS.server); localStorage.setItem('tz_local', '1'); S.server = ''; render(); } };
 }
 
 /* ——— استيراد حزمة بيانات (طلاب، معلمون، فصول، رسوم وإيصالات) ——— */
@@ -880,4 +880,12 @@ function queueOutbox(items, title, kind) {
   const now = Date.now();
   items.forEach((it, i) => save('outbox', { id: uid('o'), by: S.me ? S.me.id : '', byName: S.me ? S.me.name : '', name: it.name, phone: it.phone, text: it.text, studentId: it.studentId || '', classId: it.classId || '', kind, title, status: 'pending', createdAt: now + i }));
   toast(`📮 حُوِّلت ${items.length} رسالة إلى الإدارة لإرسالها من واتساب المجمع`, 4000);
+}
+
+/* الرجوع إلى خادم المجمع بلمسة (لمن دخل الوضع المحلي بالخطأ) */
+function reconnectServer() {
+  if (!window.DEFAULT_SERVER) return;
+  localStorage.removeItem('tz_local'); localStorage.setItem(LS.server, window.DEFAULT_SERVER);
+  S.server = window.DEFAULT_SERVER; S.me = null; S.token = null; saveSession();
+  toast('✔️ تم الربط بخادم المجمع — سجّل الدخول باسم المستخدم وكلمة المرور'); location.hash = '#/home'; render();
 }
