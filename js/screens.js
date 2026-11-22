@@ -20,7 +20,7 @@ function shell(active) {
   const bottom = ['home', 'daily', 'reports', 'leaders', 'students'].map(k => nav.find(n => n.k === k)).filter(Boolean);
   return `<div class="layout">
     <aside class="side"><div class="brand"><img src="${logoL()}" alt=""><div><b>${esc(st.complexName)}</b><small>منصة متابعة الحلقات</small></div></div>
-      <nav class="nav">${nav.map(n => `<a href="#/${n.k}" class="${active === n.k ? 'on' : ''}"><span class="ic">${n.ic}</span>${n.t}${n.badge ? `<span class="badge">${n.badge}</span>` : ''}</a>`).join('')}
+      <nav class="nav">${nav.map(n => `<a href="#/${n.k}" class="${active === n.k ? 'on' : ''}"><span class="ic">${n.ic}</span>${n.t}${n.badge ? `<span class="badge">${n.badge}</span>` : ''}</a>`).join('')}${installNavItem()}
       <a href="#" id="logout-lnk" style="margin-top:20px;opacity:.8"><span class="ic">🚪</span>${isLocal() ? 'وضع محلي' : 'تسجيل الخروج'}</a></nav></aside>
     <div class="main">
       ${isLocal() ? `<div class="mode-banner no-print">💾 يعمل التطبيق الآن على هذا الجهاز فقط. ليصل المعلمون وأولياء الأمور من أجهزتهم <a href="#/settings/server">اربطه بالخادم من هنا</a></div>` : ''}
@@ -739,6 +739,7 @@ function serverSettings(box) {
 function viewLogin(root) {
   root.innerHTML = `<div class="login"><div class="box"><div class="lg"><img src="${logoR()}"><img src="${logoL()}"></div><h2 style="color:var(--teal);margin:6px 0">منصة متابعة الحلقات</h2><p class="muted small">${esc(S.settings.complexName)}</p>
     <input class="inp" id="lu" placeholder="اسم المستخدم" dir="ltr" style="margin-bottom:8px"><input class="inp" id="lp" type="password" placeholder="كلمة المرور" dir="ltr" style="margin-bottom:12px"><button class="btn block" id="lb">دخول</button>
+    ${isStandalone() ? '' : '<button class="btn light block" style="margin-top:8px" onclick="installNow()">📲 تثبيت التطبيق على جهازك</button>'}
     <button class="btn ghost block" id="lx" style="margin-top:8px;font-size:14px">العمل محلياً بدون خادم</button></div></div>`;
   const go = async () => { const b = $('#lb'); b.disabled = true; b.textContent = '⏳'; try { const r = await api('login', { username: $('#lu').value.trim(), password: $('#lp').value }); if (!r.ok) throw new Error(r.error); S.token = r.token; S.me = r.user; saveSession(); await pull(true); location.hash = '#/home'; render(); } catch (e) { toast('⚠️ ' + e.message); } b.disabled = false; b.textContent = 'دخول'; };
   $('#lb').onclick = go; $('#lp').onkeydown = e => e.key === 'Enter' && go();
