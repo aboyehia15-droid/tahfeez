@@ -4,11 +4,11 @@ const WA_KINDS = {
   parent: { title: '🔗 إرسال رابط صفحة الطالب', opts: [['greet', 'التحية والتعريف بالصفحة', 1], ['class', 'اسم الفصل والمعلم', 0], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
   daily: { title: '📖 تقرير اليوم', opts: [['att', 'الحضور', 1], ['hifz', 'الحفظ', 1], ['review', 'المراجعة', 1], ['far', 'المراجعة البعيدة', 1], ['noor', 'النورانية', 1], ['zad', 'زاد الطفل', 1], ['cur', 'المناهج (الحروف والأرقام…)', 1], ['grade', 'التقديرات', 1], ['errors', 'الأخطاء والتصويب', 1], ['behavior', 'السلوك', 0], ['note', 'ملاحظة المعلم', 1], ['media', 'روابط التسجيلات المختارة', 1], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
   absent: { title: '❌ إشعار الغياب', opts: [['date', 'تاريخ الغياب', 1], ['count', 'عدد أيام الغياب هذا الشهر', 0], ['ask', 'طلب الحرص على الحضور', 1], ['link', 'رابط صفحة الطالب', 0], ['sign', 'توقيع المجمع', 1]] },
-  period: { title: '📊 تقرير الفترة', opts: [['hifz', 'الحفظ', 1], ['review', 'المراجعة', 1], ['surahs', 'السور التي حفظها', 0], ['noor', 'النورانية', 0], ['zad', 'زاد الطفل', 0], ['att', 'الحضور والغياب', 1], ['notes', 'ملاحظات المعلم', 1], ['errors', 'الأخطاء والتصويب', 0], ['rank', 'الترتيب في الفصل', 1], ['level', 'المستوى العام', 1], ['cur', 'التقدم في المناهج', 0], ['exams', 'نتائج الاختبارات', 0], ['fees', 'المتبقي من الرسوم', 0], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
+  period: { title: '📊 تقرير الفترة', opts: [['hifz', 'الحفظ', 1], ['review', 'المراجعة', 1], ['surahs', 'السور التي حفظها', 0], ['noor', 'النورانية', 1], ['zad', 'زاد الطفل', 1], ['cur', 'المناهج (الحروف والأرقام…)', 1], ['grade', 'التقديرات', 1], ['att', 'الحضور والغياب', 1], ['notes', 'ملاحظات المعلم', 1], ['errors', 'الأخطاء والتصويب', 1], ['media', 'التسجيلات الصوتية والمرئية', 1], ['behavior', 'السلوك', 0], ['rank', 'الترتيب في الفصل', 1], ['level', 'المستوى العام', 1], ['exams', 'نتائج الاختبارات', 0], ['fees', 'المتبقي من الرسوم', 0], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
   exam: { title: '📝 نتيجة الاختبار', opts: [['subjects', 'درجة كل مادة', 1], ['total', 'المجموع', 1], ['pct', 'النسبة', 0], ['grade', 'التقدير', 1], ['rank', 'الترتيب في الفصل', 0], ['notes', 'ملاحظة المعلم', 1], ['quran', 'ملخص أخطاء القرآن', 0], ['media', 'روابط تسجيلات الاختبار المختارة', 0], ['link', 'رابط صفحة الطالب (التفاصيل)', 1], ['sign', 'توقيع المجمع', 1]] },
   fee: { title: '💰 تذكير الرسوم', opts: [['due', 'الرسوم المستحقة', 0], ['disc', 'الخصم أو الإعفاء', 0], ['paid', 'المسدد', 1], ['remaining', 'المتبقي', 1], ['pays', 'تفاصيل الدفعات', 0], ['link', 'رابط صفحة الطالب', 0], ['sign', 'توقيع المجمع', 1]] }
 };
-function waPrefs(kind) { const d = {}; WA_KINDS[kind].opts.forEach(([k, , v]) => d[k] = v); return Object.assign(d, ((S.settings.waPrefs || {})[kind]) || {}); }
+function waPrefs(kind) { const d = {}; WA_KINDS[kind].opts.forEach(([k, , v]) => d[k] = v); const sv = ((S.settings.waPrefs || {})[kind]) || {}; if (sv._v === 2) Object.assign(d, sv); delete d._v; return d; }
 const HELLO = s => `السلام عليكم ورحمة الله وبركاته\nولي أمر الطالب: ${s.name}`;
 function ensureToken(s) { if (!s.parentToken) { s.parentToken = token20(); save('students', s); } return s; }
 
@@ -54,6 +54,7 @@ function waBuild(kind, s, ctx, o) {
     if (o.noor) { const ln = x.recs.filter(r => r.noor && r.noor.lesson).pop(); if (ln) L.push('🔤 النورانية: ' + NOORANIA[ln.noor.lesson - 1].title); }
     if (o.zad && x.zad) L.push(`🌸 زاد الطفل: ${x.zad} بنداً`);
     if (o.errors && x.errors) L.push(`✏️ الأخطاء: ${x.errors} (صُوّب ${x.fixed})`);
+    if (o.media) { const mc = x.recs.reduce((n, r) => n + (r.media || []).filter(m => m.share).length, 0); if (mc) L.push(`🎙️ التسجيلات: ${mc} (تجدونها في صفحة الطالب)`); }
     if (o.rank) { const c = classOf(s); const rk = c ? rankClass(c.id, ctx.from, ctx.to).find(y => y.s.id === s.id) : null; if (rk) L.push(`🏆 الترتيب: ${rk.rank} من ${studentsOfClass(c.id).length}`); }
     if (o.level) L.push('🎖️ المستوى: ' + levelOf(x).replace(/^\S+\s/, ''));
     if (o.cur) classSubjects(classOf(s)).filter(isCur).forEach(cid => { const c = curById(cid); const p = curProgress(s.id, cid); if (p.last) L.push(`${c.icon} ${c.name}: ${c.lessons[p.last.lesson - 1].t} (${Math.round(p.pct * 100)}%)`); });
@@ -123,7 +124,7 @@ function waCompose(kind, students, ctx = {}, title) {
   $('[data-go]', m.el).onclick = () => {
     const list = students.length > 1 ? students.filter(s => sel.includes(s.id)) : students.filter(s => s.guardianPhone);
     if (!list.length) return toast(students.length === 1 ? 'لا يوجد رقم جوال لولي الأمر' : 'اختر المستلمين');
-    if ($('#wsave', m.el).checked) { const p = Object.assign({}, S.settings.waPrefs || {}); const c = Object.assign({}, o); delete c.extra; p[kind] = c; if (!viewingArchive()) saveSettings({ waPrefs: p }); }
+    if ($('#wsave', m.el).checked) { const p = Object.assign({}, S.settings.waPrefs || {}); const c = Object.assign({}, o); delete c.extra; c._v = 2; p[kind] = c; if (!viewingArchive()) saveSettings({ waPrefs: p }); }
     m.close();
     const items = list.map(s => ({ name: s.name, phone: s.guardianPhone, text: waBuild(kind, s, ctx, o), onSent: () => { if (kind === 'parent') { s.linkSentAt = Date.now(); save('students', s); } } }));
     const go = () => { if (items.length === 1) { window.open(waLink(items[0].phone, items[0].text), '_blank'); items[0].onSent(); } else waQueueDialog(items, title || K.title); };

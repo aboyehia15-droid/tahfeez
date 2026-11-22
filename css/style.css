@@ -301,3 +301,4 @@ details.pexam summary::-webkit-details-marker{display:none}
 .sub-errbox{margin-top:10px}
 .sub-errs-ed{border:1px dashed #f0b4bd;background:#fff9fa;border-radius:10px;padding:8px 10px}
 .sub-errs-ed .err-list .e{background:#fff}
+.p-sync{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:50;background:#0f5c55e6;color:#fff;font-size:12px;padding:5px 14px;border-radius:20px;box-shadow:0 4px 14px #0002}

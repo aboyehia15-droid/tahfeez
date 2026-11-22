@@ -14,9 +14,10 @@ async function viewParent(root, tokenP) {
   root.innerHTML = '<div class="splash"><img src="assets/logo-ibntaymiyah.jpg"><div>جاري تحميل صفحة الطالب…</div></div>';
   let s;
   if (S.server) {
-    try {
-      const r = await api('parent', { t: tokenP });
-      if (!r.ok) { root.innerHTML = `<div class="splash"><div style="font-size:50px">⚠️</div><div>${esc(r.error)}</div></div>`; return; }
+    /* سريع كالبرق: تُعرض آخر نسخة محفوظة على جهاز ولي الأمر فوراً، ثم تُحدَّث من الخادم في الخلفية */
+    const CK = 'tz_p_' + tokenP; let cached = null;
+    try { cached = JSON.parse(localStorage.getItem(CK) || 'null'); } catch (e) {}
+    const apply = r => {
       S.data = { students: [], classes: [], users: [], records: [], payments: [], invites: [], exams: [], results: [], settings: [Object.assign({ id: 'main' }, r.settings)] };
       S.data.students = r.mates.map(m => ({ id: m.id, name: m.name, status: 'active', classId: r.student.classId }));
       const i = S.data.students.findIndex(x => x.id === r.student.id); if (i >= 0) S.data.students[i] = Object.assign({ status: 'active' }, r.student); else S.data.students.push(r.student);
@@ -24,8 +25,22 @@ async function viewParent(root, tokenP) {
       if (r.teacher && r.cls) S.data.users = [{ id: r.cls.teacherId, name: r.teacher.name, phone: r.teacher.phone }];
       S.data.records = r.mateRecords.filter(x => x.studentId !== r.student.id).map(x => Object.assign({ id: x.studentId + '|' + x.date, classId: r.student.classId }, x)).concat(r.records);
       S.data.payments = r.payments || []; S.data.exams = r.exams || []; S.data.results = r.results || [];
-      s = byId('students', r.student.id);
-    } catch (e) { root.innerHTML = '<div class="splash"><div style="font-size:50px">📡</div><div>تعذر الاتصال، تحقق من الإنترنت وأعد المحاولة</div><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>'; return; }
+      return byId('students', r.student.id);
+    };
+    const show = st => { document.title = 'متابعة الطالب: ' + st.name; drawParent(root, st); };
+    if (cached && cached.student) { s = apply(cached); show(s); root.insertAdjacentHTML('afterbegin', '<div class="p-sync" id="psync">⏳ يتم تحديث البيانات…</div>'); }
+    try {
+      const r = await api('parent', { t: tokenP });
+      if (!r.ok) { try { localStorage.removeItem(CK); } catch (e) {} root.innerHTML = `<div class="splash"><div style="font-size:50px">⚠️</div><div>${esc(r.error)}</div></div>`; return; }
+      const txt = JSON.stringify(r);
+      if (!cached || JSON.stringify(cached) !== txt) { const y = window.scrollY; s = apply(r); show(s); window.scrollTo(0, y); }
+      else { const ps = $('#psync'); if (ps) ps.remove(); }
+      try { localStorage.setItem(CK, txt); } catch (e) {}
+      return;
+    } catch (e) {
+      if (cached && cached.student) { const ps = $('#psync'); if (ps) ps.textContent = '📡 بدون اتصال — آخر بيانات محفوظة'; return; }
+      root.innerHTML = '<div class="splash"><div style="font-size:50px">📡</div><div>تعذر الاتصال، تحقق من الإنترنت وأعد المحاولة</div><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>'; return;
+    }
   } else {
     s = T('students').find(x => x.parentToken === tokenP);
     if (!s) { root.innerHTML = '<div class="splash"><div style="font-size:50px">🔒</div><div>الرابط غير صحيح — أو أن التطبيق غير مربوط بالخادم بعد</div></div>'; return; }
