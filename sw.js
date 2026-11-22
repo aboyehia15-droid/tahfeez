@@ -1,5 +1,5 @@
 // الشبكة أولاً: أي تحديث يُرفع على GitHub يصل للأجهزة تلقائياً، والنسخة المخزنة للعمل دون إنترنت
-const CACHE = 'tahfeez-v9';
+const CACHE = 'tahfeez-v10';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('tahfeez-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));

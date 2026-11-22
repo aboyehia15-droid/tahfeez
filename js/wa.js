@@ -23,9 +23,9 @@ function waBuild(kind, s, ctx, o) {
     const r = getRec(s.id, ctx.date) || {}; const g = x => o.grade && x && x.grade ? ' — ' + gradeLabel(x.grade) : '';
     L.push(HELLO(s)); L.push(`📅 تقرير يوم ${fmtDate(ctx.date)}`);
     if (o.att && r.att) L.push('✅ الحضور: ' + (ATT[r.att] || [''])[0]);
-    if (o.hifz && r.hifz && r.hifz.s1) L.push('📖 الحفظ: ' + Q.rangeText(r.hifz) + g(r.hifz));
-    if (o.review && r.review && r.review.s1) L.push('🔁 المراجعة: ' + Q.rangeText(r.review) + g(r.review));
-    if (o.far && r.far && r.far.s1) L.push('🕰️ المراجعة البعيدة: ' + Q.rangeText(r.far) + g(r.far));
+    if (o.hifz && hasSeg(r.hifz)) L.push('📖 الحفظ: ' + segText(r.hifz) + g(r.hifz));
+    if (o.review && hasSeg(r.review)) L.push('🔁 المراجعة: ' + segText(r.review) + g(r.review));
+    if (o.far && hasSeg(r.far)) L.push('🕰️ المراجعة البعيدة: ' + segText(r.far) + g(r.far));
     if (o.noor && r.noor && r.noor.lesson) L.push('🔤 النورانية: ' + NOORANIA[r.noor.lesson - 1].title + g(r.noor));
     if (o.zad) (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat); L.push('🌸 ' + (c ? c.name : '') + ': ' + z.item + g(z)); });
     if (o.cur) Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (c && x && x.lesson) L.push(c.icon + ' ' + c.name + ': ' + c.lessons[x.lesson - 1].t + g(x)); });

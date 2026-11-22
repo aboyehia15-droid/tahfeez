@@ -190,10 +190,19 @@ function ayahBoxHTML(range, errors) {
 }
 function wordOf(s, a, w) { const t = ayahTextAvailable(s); return t ? (t[a - 1].split(/\s+/)[w] || '') : ''; }
 
+/* ——— مقاطع متعددة في القسم الواحد (مثال: الفاتحة + من الناس إلى الفلق) ——— */
+function segs(x) { if (!x) return []; return (x.s1 ? [x] : []).concat((x.extra || []).filter(e => e && e.s1)); }
+function segText(x) { return segs(x).map(g => Q.rangeText(Object.assign({}, g, { s2: g.s2 || g.s1 }))).join(' + '); }
+function segPages(x) { return segs(x).reduce((a, g) => a + Q.pagesBetween(g.s1, g.a1, g.s2 || g.s1, g.a2), 0); }
+function segAyahs(x) { return segs(x).flatMap(g => Q.ayahSet(Object.assign({}, g, { s2: g.s2 || g.s1 }))); }
+function lastSeg(x) { const a = segs(x); return a[a.length - 1]; }
+function hasSeg(x) { return segs(x).length > 0; }
+function segAyahBoxes(x, errs) { return segs(x).map(g => ayahBoxHTML(Object.assign({}, g, { s2: g.s2 || g.s1 }), errs)).join(''); }
+
 /* ——— ما حفظه الطالب (مجموعة الآيات) ——— */
 function memorizedSet(recs) {
   const set = new Set();
-  recs.forEach(r => { if (r.att === 'a' || r.att === 'e') return; if (r.hifz && r.hifz.s1 && (r.hifz.grade || 3) >= 2) Q.ayahSet(r.hifz).forEach(k => set.add(k)); });
+  recs.forEach(r => { if (r.att === 'a' || r.att === 'e') return; if (hasSeg(r.hifz) && (r.hifz.grade || 3) >= 2) segAyahs(r.hifz).forEach(k => set.add(k)); });
   return set;
 }
 function surahProgress(set) { return Q.SUR.map((s, i) => { let c = 0; for (let a = 1; a <= s[1]; a++) if (set.has(Q.idx(i + 1, a))) c++; return c / s[1]; }); }

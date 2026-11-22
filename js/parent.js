@@ -101,14 +101,14 @@ function parentDay(r, subj) {
     const es = (r.errors || []).filter(e => e.sub === sub && (sub !== 'noor' || !r.noor || e.lesson == r.noor.lesson || !e.lesson));
     if (!es.length) return '';
     let h = `<div class="sub-errs">${es.map(e => `<div class="small">${e.fixed ? '✅' : '❌'} ${sub === 'noor' ? '«' + esc(e.word || '') + '»' : (Q.names[e.s - 1] || '') + ' ' + (e.a || '') + (e.word ? ' «' + esc(e.word) + '»' : '')} — ${esc(e.type || '')}${e.note ? ': ' + esc(e.note) : ''}</div>`).join('')}`;
-    if (rng && es.some(e => e.word)) { const box = ayahBoxHTML(rng, es.filter(e => e.word)); if (box) h += box.replace('class="ayah-box"', 'class="ayah-box" style="font-size:20px;max-height:180px;margin-top:4px"'); }
+    if (rng && es.some(e => e.word)) { const box = segAyahBoxes(rng, es.filter(e => e.word)); if (box) h += box.split('class="ayah-box"').join('class="ayah-box" style="font-size:20px;max-height:180px;margin-top:4px"'); }
     return h + '</div>';
   };
   const usedM = new Set(); const mp = sub => { usedM.add(sub); return PF('media') && S.settings.parentShowMedia !== false ? mediaPlayers(r.media, sub) : ''; };
   const L = [];
   if (r.att === 'l' && PF('att')) L.push('<span class="chip gold">متأخر</span>');
   [['hifz', '📖', 'الحفظ'], ['review', '🔁', 'المراجعة'], ['far', '🕰️', 'المراجعة البعيدة']].forEach(([k, ic, nm]) => {
-    if (PF(k) && r[k] && r[k].s1) L.push(`${ic} <b>${nm}:</b> ${Q.rangeText(r[k])} <span class="muted">(${num(r[k].pages)} وجه)</span> ${gc(r[k].grade)}${errsOf(k, r[k])}${mp(k)}`);
+    if (PF(k) && hasSeg(r[k])) L.push(`${ic} <b>${nm}:</b> ${segText(r[k])} <span class="muted">(${num(r[k].pages)} وجه)</span> ${gc(r[k].grade)}${errsOf(k, r[k])}${mp(k)}`);
   });
   if (mp('')) L.push(mp(''));
   if (PF('noor') && r.noor && r.noor.lesson) { const N = NOORANIA[r.noor.lesson - 1]; L.push(`🔤 <b>النورانية:</b> ${esc(N.title)}${r.noor.from ? ` <span class="muted">(من «${esc(N.items[r.noor.from - 1] || '')}» إلى «${esc(N.items[r.noor.to - 1] || '')}»)</span>` : ''} ${gc(r.noor.grade)}${errsOf('noor')}${mp('noor')}`); }

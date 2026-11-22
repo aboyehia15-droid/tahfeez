@@ -11,9 +11,9 @@ function recSummary(r, subj) {
   if (r.att === 'a') return '<span class="chip red">غائب</span>';
   if (r.att === 'e') return '<span class="chip blue">مستأذن</span>';
   const out = [];
-  if (subj.includes('quran') && r.hifz && r.hifz.s1) out.push(`<span class="chip">📖 ${Q.rangeText(r.hifz)} · ${num(r.hifz.pages)}و</span>${gradeChip(r.hifz.grade)}`);
-  if (subj.includes('quran') && r.review && r.review.s1) out.push(`<span class="chip blue">🔁 ${Q.rangeText(r.review)} · ${num(r.review.pages)}و</span>${gradeChip(r.review.grade)}`);
-  if (subj.includes('quran') && r.far && r.far.s1) out.push(`<span class="chip" style="background:#efe7fb;color:#5b3fb0">🕰️ ${Q.rangeText(r.far)} · ${num(r.far.pages)}و</span>${gradeChip(r.far.grade)}`);
+  if (subj.includes('quran') && hasSeg(r.hifz)) out.push(`<span class="chip">📖 ${segText(r.hifz)} · ${num(r.hifz.pages)}و</span>${gradeChip(r.hifz.grade)}`);
+  if (subj.includes('quran') && hasSeg(r.review)) out.push(`<span class="chip blue">🔁 ${segText(r.review)} · ${num(r.review.pages)}و</span>${gradeChip(r.review.grade)}`);
+  if (subj.includes('quran') && hasSeg(r.far)) out.push(`<span class="chip" style="background:#efe7fb;color:#5b3fb0">🕰️ ${segText(r.far)} · ${num(r.far.pages)}و</span>${gradeChip(r.far.grade)}`);
   subj.filter(isCur).forEach(cid => { const x = (r.cur || {})[cid]; if (x && x.lesson) out.push(curChip(cid, x)); });
   if (subj.includes('noor') && r.noor && r.noor.lesson) out.push(`<span class="chip gold">🔤 د${r.noor.lesson}${r.noor.from ? ' (' + r.noor.from + '–' + r.noor.to + ')' : ''}</span>${gradeChip(r.noor.grade)}`);
   if (subj.includes('zad') && r.zad && r.zad.length) out.push(`<span class="chip" style="background:#fbe7ee;color:#a3325a">🌸 ${r.zad.length} من زاد الطفل</span>`);
@@ -27,9 +27,9 @@ function dailySummaryText(r) {
   if (r.att === 'a') return 'غائب';
   const L = [];
   if (r.att === 'l') L.push('⏰ متأخر');
-  if (r.hifz && r.hifz.s1) L.push('📖 الحفظ: ' + Q.rangeText(r.hifz) + (r.hifz.grade ? ' — ' + gradeLabel(r.hifz.grade) : ''));
-  if (r.review && r.review.s1) L.push('🔁 المراجعة: ' + Q.rangeText(r.review) + (r.review.grade ? ' — ' + gradeLabel(r.review.grade) : ''));
-  if (r.far && r.far.s1) L.push('🕰️ المراجعة البعيدة: ' + Q.rangeText(r.far) + (r.far.grade ? ' — ' + gradeLabel(r.far.grade) : ''));
+  if (hasSeg(r.hifz)) L.push('📖 الحفظ: ' + segText(r.hifz) + (r.hifz.grade ? ' — ' + gradeLabel(r.hifz.grade) : ''));
+  if (hasSeg(r.review)) L.push('🔁 المراجعة: ' + segText(r.review) + (r.review.grade ? ' — ' + gradeLabel(r.review.grade) : ''));
+  if (hasSeg(r.far)) L.push('🕰️ المراجعة البعيدة: ' + segText(r.far) + (r.far.grade ? ' — ' + gradeLabel(r.far.grade) : ''));
   Object.keys(r.cur || {}).forEach(cid => { const t = curLine(cid, r.cur[cid]); if (t) L.push(t); });
   if (r.noor && r.noor.lesson) L.push('🔤 النورانية: ' + NOORANIA[r.noor.lesson - 1].title + (r.noor.grade ? ' — ' + gradeLabel(r.noor.grade) : ''));
   (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat); L.push('🌸 ' + (c ? c.name : '') + ': ' + z.item + (z.grade ? ' — ' + gradeLabel(z.grade) : '')); });
@@ -103,12 +103,12 @@ function recordEditor(s, date) {
     let h = '';
     if (subj.includes('quran')) {
       const lh = lastRec(s.id, date, 'hifz'), lr = lastRec(s.id, date, 'review'), lf = lastRec(s.id, date, 'far');
-      const sugH = lh ? suggestNext(lh.hifz, s.direction || S.settings.directionDefault) : null;
+      const sugH = lh ? suggestNext(lastSeg(lh.hifz), s.direction || S.settings.directionDefault) : null;
       const memo = memorizedSet(allRecsOf(s.id).filter(x => x.date < date)); const prog = surahProgress(memo);
       const memChips = k => { const done = JUZ_LIST.flatMap(j => j.surahs).filter(n => prog[n - 1] > 0); return done.length ? `<div class="small" style="margin:6px 0"><span class="muted">${k === 'hifz' ? 'السور المحفوظة سابقاً:' : 'اختر من محفوظه:'}</span> ${done.map(n => `<button type="button" class="chip ${prog[n - 1] >= 1 ? '' : 'gold'}" style="border:0;cursor:pointer;margin:2px" data-msur="${k}|${n}" title="${Math.round(prog[n - 1] * 100)}%">${Q.names[n - 1]}${prog[n - 1] < 1 ? ' ½' : ''}</button>`).join('')}</div>` : ''; };
-      h += sec('hifz', '📖 الحفظ الجديد', `${lh ? `<div class="small muted" style="margin-bottom:6px">آخر حفظ (${fmtDate(lh.date, false)}): <b>${Q.rangeText(lh.hifz)}</b> ${gradeChip(lh.hifz.grade)}${sugH && !(r.hifz && r.hifz.s1) ? ` <button class="btn sm gold" data-sug="hifz">↩️ متابعة: ${Q.rangeText(sugH)}</button>` : ''}</div>` : ''}<div data-rp="hifz"></div>${memChips('hifz')}<div class="voice-text" data-vt="hifz" hidden></div><div style="margin-top:8px">${gradeButtons((r.hifz || {}).grade, 'hifz')}</div><div data-ab="hifz"></div>`, true);
-      h += sec('review', '🔁 المراجعة القريبة', `${lr ? `<div class="small muted" style="margin-bottom:6px">آخر مراجعة (${fmtDate(lr.date, false)}): <b>${Q.rangeText(lr.review)}</b>${!(r.review && r.review.s1) ? ` <button class="btn sm light" data-sug="review">↩️ نفس المقطع</button>` : ''}${lh && !(r.review && r.review.s1) ? ` <button class="btn sm light" data-sug="review-h">📖 مراجعة آخر حفظ</button>` : ''}</div>` : ''}<div data-rp="review"></div>${memChips('review')}<div class="voice-text" data-vt="review" hidden></div><div style="margin-top:8px">${gradeButtons((r.review || {}).grade, 'review')}</div><div data-ab="review"></div>`, true);
-      h += sec('far', '🕰️ المراجعة البعيدة', `${lf ? `<div class="small muted" style="margin-bottom:6px">آخر مراجعة بعيدة (${fmtDate(lf.date, false)}): <b>${Q.rangeText(lf.far)}</b>${!(r.far && r.far.s1) ? ` <button class="btn sm light" data-sug="far">↩️ ما بعدها</button>` : ''}</div>` : ''}<div data-rp="far"></div>${memChips('far')}<div class="voice-text" data-vt="far" hidden></div><div style="margin-top:8px">${gradeButtons((r.far || {}).grade, 'far')}</div><div data-ab="far"></div>`, true);
+      h += sec('hifz', '📖 الحفظ الجديد', `${lh ? `<div class="small muted" style="margin-bottom:6px">آخر حفظ (${fmtDate(lh.date, false)}): <b>${segText(lh.hifz)}</b> ${gradeChip(lh.hifz.grade)}${sugH && !(hasSeg(r.hifz)) ? ` <button class="btn sm gold" data-sug="hifz">↩️ متابعة: ${Q.rangeText(sugH)}</button>` : ''}</div>` : ''}<div data-rp="hifz"></div>${memChips('hifz')}<div class="voice-text" data-vt="hifz" hidden></div><div style="margin-top:8px">${gradeButtons((r.hifz || {}).grade, 'hifz')}</div><div data-ab="hifz"></div>`, true);
+      h += sec('review', '🔁 المراجعة القريبة', `${lr ? `<div class="small muted" style="margin-bottom:6px">آخر مراجعة (${fmtDate(lr.date, false)}): <b>${segText(lr.review)}</b>${!(hasSeg(r.review)) ? ` <button class="btn sm light" data-sug="review">↩️ نفس المقطع</button>` : ''}${lh && !(hasSeg(r.review)) ? ` <button class="btn sm light" data-sug="review-h">📖 مراجعة آخر حفظ</button>` : ''}</div>` : ''}<div data-rp="review"></div>${memChips('review')}<div class="voice-text" data-vt="review" hidden></div><div style="margin-top:8px">${gradeButtons((r.review || {}).grade, 'review')}</div><div data-ab="review"></div>`, true);
+      h += sec('far', '🕰️ المراجعة البعيدة', `${lf ? `<div class="small muted" style="margin-bottom:6px">آخر مراجعة بعيدة (${fmtDate(lf.date, false)}): <b>${segText(lf.far)}</b>${!(hasSeg(r.far)) ? ` <button class="btn sm light" data-sug="far">↩️ ما بعدها</button>` : ''}</div>` : ''}<div data-rp="far"></div>${memChips('far')}<div class="voice-text" data-vt="far" hidden></div><div style="margin-top:8px">${gradeButtons((r.far || {}).grade, 'far')}</div><div data-ab="far"></div>`, true);
     }
     if (subj.includes('noor')) {
       const ln = lastRec(s.id, date, 'noor'); r.noor = r.noor || {};
@@ -129,8 +129,9 @@ function recordEditor(s, date) {
     ['hifz', 'review', 'far'].forEach(k => {
       const host = $(`[data-rp="${k}"]`, eb); if (!host) return;
       r[k] = r[k] || {};
-      const rp = rangePicker(r[k], rr => { r[k] = Object.assign(r[k], rr); drawAyahs(k); });
-      host.appendChild(rp); host._rp = rp; drawAyahs(k);
+      const rp = rangePicker(r[k], rr => { r[k] = Object.assign(r[k], rr); drawAyahs(k); updTotal(k); });
+      host.appendChild(rp); host._rp = rp;
+      const ex = document.createElement('div'); ex.dataset.extra = k; host.after(ex); drawExtras(k); drawAyahs(k);
     });
     drawNoor(); drawErrs();
     bindGrades(eb, (name, g) => {
@@ -140,12 +141,27 @@ function recordEditor(s, date) {
       else if (name.startsWith('zad|')) { const [, cat, item] = name.split('|'); const z = r.zad.find(z => z.cat === cat && z.item === item); if (z) z.grade = g; }
     });
   };
+  function updTotal(k) { const el = $(`[data-segtot="${k}"]`, eb); if (el) { const n = segs(r[k]).length; el.innerHTML = n > 1 ? `<span class="pages-badge">المجموع: ${num(segPages(r[k]))} وجه</span> <span class="small muted">${esc(segText(r[k]))}</span>` : ''; } }
+  function drawExtras(k) {
+    const host = $(`[data-extra="${k}"]`, eb); if (!host) return; host.innerHTML = '';
+    r[k].extra = r[k].extra || [];
+    r[k].extra.forEach((seg, i) => {
+      const box = document.createElement('div'); box.className = 'seg-box';
+      box.innerHTML = `<div class="row small" style="margin-bottom:4px"><b>➕ مقطع ${i + 2}</b><span style="flex:1"></span><button type="button" class="btn sm ghost" data-rmseg="${i}">✕ حذف المقطع</button></div>`;
+      box.appendChild(rangePicker(seg, rr => { Object.assign(seg, rr); drawAyahs(k); updTotal(k); }));
+      $('[data-rmseg]', box).onclick = () => { r[k].extra.splice(i, 1); drawExtras(k); drawAyahs(k); updTotal(k); };
+      host.appendChild(box);
+    });
+    const add = document.createElement('div'); add.className = 'row'; add.style.margin = '6px 0';
+    add.innerHTML = `<button type="button" class="btn sm light">➕ إضافة سورة / مقطع آخر</button><span data-segtot="${k}"></span>`;
+    $('button', add).onclick = () => { r[k].extra.push({}); drawExtras(k); };
+    host.appendChild(add); updTotal(k);
+  }
   function drawAyahs(k) {
     const host = $(`[data-ab="${k}"]`, eb); if (!host) return;
     const errs = r.errors.filter(e => e.sub === k);
-    host.innerHTML = ayahBoxHTML(r[k], errs);
-    const box = $('.ayah-box', host); if (!box) return;
-    box.onclick = e => { const w = e.target.closest('.w'); if (!w) return; const s1 = +w.dataset.s, a1 = +w.dataset.a, wi = +w.dataset.w; const ex = r.errors.find(x => x.sub === k && x.s == s1 && x.a == a1 && x.w == wi); if (ex) { if (!ex.fixed) ex.fixed = true; else r.errors = r.errors.filter(x => x !== ex); } else r.errors.push({ id: uid('e'), sub: k, s: s1, a: a1, w: wi, word: wordOf(s1, a1, wi), type: 'نسيان', note: '' }); drawAyahs(k); drawErrs(); };
+    host.innerHTML = segAyahBoxes(r[k], errs);
+    $$('.ayah-box', host).forEach(box => box.onclick = e => { const w = e.target.closest('.w'); if (!w) return; const s1 = +w.dataset.s, a1 = +w.dataset.a, wi = +w.dataset.w; const ex = r.errors.find(x => x.sub === k && x.s == s1 && x.a == a1 && x.w == wi); if (ex) { if (!ex.fixed) ex.fixed = true; else r.errors = r.errors.filter(x => x !== ex); } else r.errors.push({ id: uid('e'), sub: k, s: s1, a: a1, w: wi, word: wordOf(s1, a1, wi), type: 'نسيان', note: '' }); drawAyahs(k); drawErrs(); });
   }
   function drawNoor() {
     const host = $('#nitems', eb); if (!host) return;
@@ -191,9 +207,9 @@ function recordEditor(s, date) {
     const sg = t.closest('[data-sug]');
     if (sg) {
       const k = sg.dataset.sug;
-      if (k === 'hifz') { const lh = lastRec(s.id, date, 'hifz'); const sug = suggestNext(lh.hifz, s.direction || S.settings.directionDefault); if (sug) $('[data-rp="hifz"]', eb)._rp.set(sug); sg.remove(); }
+      if (k === 'hifz') { const lh = lastRec(s.id, date, 'hifz'); const sug = suggestNext(lastSeg(lh.hifz), s.direction || S.settings.directionDefault); if (sug) $('[data-rp="hifz"]', eb)._rp.set(sug); sg.remove(); }
       if (k === 'review') { const lr = lastRec(s.id, date, 'review'); $('[data-rp="review"]', eb)._rp.set({ s1: lr.review.s1, a1: lr.review.a1, s2: lr.review.s2, a2: lr.review.a2 }); sg.remove(); }
-      if (k === 'far') { const lf = lastRec(s.id, date, 'far'); const nx = suggestNext(lf.far, s.direction || S.settings.directionDefault); if (nx) $('[data-rp="far"]', eb)._rp.set(nx); sg.remove(); }
+      if (k === 'far') { const lf = lastRec(s.id, date, 'far'); const nx = suggestNext(lastSeg(lf.far), s.direction || S.settings.directionDefault); if (nx) $('[data-rp="far"]', eb)._rp.set(nx); sg.remove(); }
       if (k === 'review-h') { const lh = lastRec(s.id, date, 'hifz'); $('[data-rp="review"]', eb)._rp.set({ s1: lh.hifz.s1, a1: lh.hifz.a1, s2: lh.hifz.s2, a2: lh.hifz.a2 }); sg.remove(); }
       if (k === 'noor') { const ln = lastRec(s.id, date, 'noor'); const L = NOORANIA[ln.noor.lesson - 1]; let les = ln.noor.lesson, fr = (Math.max(ln.noor.from || 0, ln.noor.to || 0)) + 1; if (fr > L.items.length) { les = Math.min(NOORANIA.length, les + 1); fr = 1; } const len = Math.max(5, Math.abs((ln.noor.to || 0) - (ln.noor.from || 0)) + 1); r.noor = { lesson: les, from: fr, to: Math.min(NOORANIA[les - 1].items.length, fr + len - 1), grade: 0 }; drawBody(); }
       return;
@@ -213,7 +229,7 @@ function recordEditor(s, date) {
       });
       return;
     }
-    const rb = t.closest('[data-rec]'); if (rb) { const sub = rb.dataset.rsub || ''; const NM = { hifz: 'حفظ', review: 'مراجعة', far: 'مراجعة بعيدة', noor: 'النورانية', zad: 'زاد الطفل' }; const rngs = { hifz: r.hifz, review: r.review, far: r.far }; let what = NM[sub] || (curById(sub) ? curById(sub).name : 'تسميع'); if (rngs[sub] && rngs[sub].s1) what += ' ' + Q.rangeText(rngs[sub]); if (sub === 'noor' && r.noor && r.noor.lesson) what += ' — الدرس ' + r.noor.lesson; if (curById(sub) && r.cur[sub] && r.cur[sub].lesson) what += ' — ' + curShort(curById(sub).lessons[r.cur[sub].lesson - 1].t); recordMedia(rb.dataset.rec, s.name.split(' ')[0] + ': ' + what + ' (' + fmtDate(date, false) + ')').then(x => { if (x) { x.sub = sub; r.media.push(x); save('records', Object.assign({}, r)); drawBody(); } }); return; }
+    const rb = t.closest('[data-rec]'); if (rb) { const sub = rb.dataset.rsub || ''; const NM = { hifz: 'حفظ', review: 'مراجعة', far: 'مراجعة بعيدة', noor: 'النورانية', zad: 'زاد الطفل' }; const rngs = { hifz: r.hifz, review: r.review, far: r.far }; let what = NM[sub] || (curById(sub) ? curById(sub).name : 'تسميع'); if (hasSeg(rngs[sub])) what += ' ' + segText(rngs[sub]); if (sub === 'noor' && r.noor && r.noor.lesson) what += ' — الدرس ' + r.noor.lesson; if (curById(sub) && r.cur[sub] && r.cur[sub].lesson) what += ' — ' + curShort(curById(sub).lessons[r.cur[sub].lesson - 1].t); recordMedia(rb.dataset.rec, s.name.split(' ')[0] + ': ' + what + ' (' + fmtDate(date, false) + ')').then(x => { if (x) { x.sub = sub; r.media.push(x); save('records', Object.assign({}, r)); drawBody(); } }); return; }
     const msh = t.closest('[data-mshare]'), mdl = t.closest('[data-mdel]'); if (msh || mdl) { if (msh) r.media[+msh.dataset.mshare].share = !r.media[+msh.dataset.mshare].share; else r.media.splice(+mdl.dataset.mdel, 1); drawBody(); return; }
     const ms = t.closest('[data-msur]'); if (ms) { const [k, n] = ms.dataset.msur.split('|'); const sn = +n; $(`[data-rp="${k}"]`, eb)._rp.set({ s1: sn, a1: 1, s2: sn, a2: Q.count(sn) }); return; }
     const cs = t.closest('[data-csug]'); if (cs) { r.cur[cs.dataset.csug] = curSuggest(s.id, date, cs.dataset.csug); drawBody(); return; }
@@ -229,7 +245,7 @@ function recordEditor(s, date) {
     if (t.id === 'eadd') addErrorManual();
   });
   const doSave = () => {
-    ['hifz', 'review', 'far'].forEach(k => { if (r[k] && r[k].s1) { r[k].s2 = r[k].s2 || r[k].s1; r[k].pages = +Q.pagesBetween(r[k].s1, r[k].a1, r[k].s2, r[k].a2).toFixed(3); } else delete r[k]; });
+    ['hifz', 'review', 'far'].forEach(k => { const x = r[k]; if (!x) return; x.extra = (x.extra || []).filter(g => g && g.s1); x.extra.forEach(g => { g.s2 = g.s2 || g.s1; g.pages = +Q.pagesBetween(g.s1, g.a1, g.s2, g.a2).toFixed(3); }); if (!x.s1 && x.extra.length) { const f0 = x.extra.shift(); Object.assign(x, { s1: f0.s1, a1: f0.a1, s2: f0.s2, a2: f0.a2 }); } if (!x.extra.length) delete x.extra; if (hasSeg(x)) { x.s2 = x.s2 || x.s1; x.pages = +segPages(x).toFixed(3); } else delete r[k]; });
     if (r.noor && !r.noor.lesson) delete r.noor; if (r.noor) delete r.noor._picked;
     if (r.att === 'a' || r.att === 'e') { delete r.hifz; delete r.review; delete r.far; delete r.noor; r.zad = []; r.cur = {}; }
     Object.keys(r.cur || {}).forEach(k => { if (!r.cur[k] || !r.cur[k].lesson) delete r.cur[k]; });
