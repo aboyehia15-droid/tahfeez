@@ -194,6 +194,8 @@ function route_(r) {
     if (st2.regClosed) return { ok: false, error: 'التسجيل مغلق حالياً' };
     var f = r.student || {};
     if (!f.name || !f.guardianPhone) return { ok: false, error: 'الاسم وجوال ولي الأمر مطلوبان' };
+    var REQ = { name: 'اسم الطالب', idNumber: 'السجل المدني', nationality: 'الجنسية', birthDate: 'تاريخ الميلاد', guardianName: 'اسم ولي الأمر', guardianId: 'هوية ولي الأمر', guardianPhone: 'جوال ولي الأمر', phone2: 'الجوال الآخر', relation: 'صلة القرابة', work: 'جهة العمل', background: 'الخلفية السابقة', health: 'الحالة الصحية' };
+    for (var rk in REQ) if (!String(f[rk] == null ? '' : f[rk]).trim()) return { ok: false, error: 'الخانة مطلوبة: ' + REQ[rk] };
     var dup = readAll_('students').filter(function (x) { return x.idNumber && f.idNumber && String(x.idNumber) === String(f.idNumber); })[0];
     if (dup) return { ok: false, error: 'هذا الطالب مسجل مسبقاً (رقم السجل مكرر)' };
     f.id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

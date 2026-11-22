@@ -306,3 +306,4 @@ details.pexam summary::-webkit-details-marker{display:none}
 .p-hero{position:relative}.p-fs{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:#ffffffd9;z-index:2}
 @media print{body{zoom:1!important}.fs-btn{display:none}}
 .p-tabs{flex-wrap:wrap;overflow:visible!important;gap:6px}.p-tabs button{flex:1 1 auto;padding-inline:10px}
+.inp.bad{border-color:var(--red)!important;background:#fff5f6;box-shadow:0 0 0 3px #e5484d22}

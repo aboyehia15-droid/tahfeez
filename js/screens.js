@@ -132,8 +132,8 @@ const STU_FIELDS = [
 function fieldHTML(f, val) {
   const [k, l, type, req] = f; const id = 'f_' + k;
   let inp;
-  if (type.startsWith('select:')) inp = `<select class="inp" id="${id}" name="${k}"><option value="">—</option>${type.slice(7).split('|').map(o => `<option ${val === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
-  else if (type === 'textarea') inp = `<textarea class="inp" id="${id}" name="${k}" rows="2">${esc(val || '')}</textarea>`;
+  if (type.startsWith('select:')) inp = `<select class="inp" id="${id}" name="${k}" ${req ? 'required' : ''}><option value="">—</option>${type.slice(7).split('|').map(o => `<option ${val === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+  else if (type === 'textarea') inp = `<textarea class="inp" id="${id}" name="${k}" rows="2" ${req ? 'required placeholder="اكتب «لا يوجد» إن لم يكن"' : ''}>${esc(val || '')}</textarea>`;
   else inp = `<input class="inp" id="${id}" name="${k}" type="${type}" value="${esc(val || '')}" ${type === 'tel' ? 'inputmode="tel" dir="ltr" placeholder="05xxxxxxxx"' : ''} ${req ? 'required' : ''}>`;
   return `<div class="field"><label for="${id}" class="${req ? 'req' : ''}">${l}</label>${inp}</div>`;
 }

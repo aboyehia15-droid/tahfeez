@@ -147,14 +147,19 @@ async function viewRegForm(root) {
   document.title = 'تسجيل طالب — ' + st.complexName;
   if (st.regClosed) { root.innerHTML = `<div class="splash"><img src="${logoL()}"><h2>التسجيل مغلق حالياً</h2><div>${esc(st.complexName)}</div></div>`; return; }
   root.innerHTML = `<div class="reg-wrap"><div class="p-hero" style="padding-bottom:60px"><div class="logos"><img src="${logoR()}"><img src="${logoL()}"></div><h1>📝 تسجيل طالب جديد</h1><div class="sub">${esc(st.programName)} — ${esc(st.complexName)}</div></div>
-    <div class="reg-card"><p style="margin-top:0;color:var(--teal)">${esc(st.regNote || '')}</p><form id="rf">${STU_FIELDS.map(f => fieldHTML(f, '')).join('')}
+    <div class="reg-card"><p style="margin-top:0;color:var(--teal)">${esc(st.regNote || '')}</p><form id="rf" novalidate><p class="small" style="margin:0 0 10px;color:var(--red)">جميع الخانات مطلوبة *</p>${STU_FIELDS.map(f => fieldHTML([f[0], f[1], f[2], 1], '')).join('')}
       <div class="field" id="agebox" style="display:none"><label>العمر بالتاريخ الميلادي</label><div class="chip gold" id="age"></div></div>
       <button class="btn block gold" style="font-size:19.5px;padding:14px" type="submit">✔️ إرسال التسجيل</button></form></div></div>`;
   $('#f_birthDate').onchange = e => { const a = ageFrom(e.target.value); $('#agebox').style.display = a !== '' ? '' : 'none'; $('#age').textContent = a + ' سنوات'; };
+  $('#rf').addEventListener('input', e => e.target.classList.remove('bad')); $('#rf').addEventListener('change', e => e.target.classList.remove('bad'));
   $('#rf').onsubmit = async e => {
     e.preventDefault(); const o = readForm($('#rf'));
+    $$('#rf .inp').forEach(i => i.classList.remove('bad'));
+    const miss = STU_FIELDS.filter(f => !String(o[f[0]] || '').trim());
+    if (miss.length) { const el = $('#f_' + miss[0][0]); miss.forEach(f => { const x = $('#f_' + f[0]); if (x) x.classList.add('bad'); }); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => el.focus(), 300); return toast('⚠️ أكمل: ' + miss[0][1] + (miss.length > 1 ? ` (و${miss.length - 1} خانات أخرى)` : ''), 3500); }
     if (!o.name || o.name.split(/\s+/).length < 3) return toast('اكتب اسم الطالب رباعياً');
     if (normPhone(o.guardianPhone).length < 11) return toast('اكتب رقم جوال ولي الأمر بشكل صحيح');
+    if (normPhone(o.phone2).length < 11) { $('#f_phone2').classList.add('bad'); return toast('اكتب رقم الجوال الآخر بشكل صحيح'); }
     o.guardianPhone = normPhone(o.guardianPhone); if (o.phone2) o.phone2 = normPhone(o.phone2);
     o.age = ageFrom(o.birthDate);
     const b = $('#rf button[type=submit]'); b.disabled = true; b.textContent = '⏳ جاري الإرسال…';

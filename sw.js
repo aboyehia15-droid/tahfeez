@@ -1,7 +1,7 @@
 // سريع كالبرق: ملفات البرنامج (المرقّمة بـ ?v=) تُقرأ من ذاكرة الجهاز فوراً دون انتظار الإنترنت.
 // الصفحة الرئيسية تُطلب من الشبكة أولاً (بمهلة قصيرة) حتى يصل أي تحديث يُرفع على GitHub،
 // ورقم الإصدار الجديد في index.html يجلب الملفات الجديدة تلقائياً. وبدون إنترنت يعمل من النسخة المخزنة.
-const CACHE = 'tahfeez-v16';
+const CACHE = 'tahfeez-v17';
 const SHELL = ['./', 'index.html', 'manifest.json', 'assets/icon-192.png', 'assets/logo-ibntaymiyah.jpg'];
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
