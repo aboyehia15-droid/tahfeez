@@ -41,7 +41,7 @@ function loadLocal() {
   try { S.data = JSON.parse(localStorage.getItem(LS.data) || '{}'); } catch (e) { S.data = {}; }
   TABLE_NAMES.forEach(t => { if (!Array.isArray(S.data[t])) S.data[t] = []; });
   try { const s = JSON.parse(localStorage.getItem(LS.sess) || 'null'); if (s) { S.me = s.me; S.token = s.token; } } catch (e) {}
-  S.server = localStorage.getItem(LS.server) || '';
+  S.server = localStorage.getItem(LS.server) || (localStorage.getItem('tz_local') ? '' : (window.DEFAULT_SERVER || ''));
 }
 let _persistT;
 function persist() { clearTimeout(_persistT); _persistT = setTimeout(() => { try { localStorage.setItem(LS.data, JSON.stringify(S.data)); } catch (e) { toast('⚠️ مساحة التخزين ممتلئة'); } }, 150); }
@@ -83,8 +83,21 @@ function normPhone(p) {
 function waLink(phone, text) { return 'https://wa.me/' + normPhone(phone) + '?text=' + encodeURIComponent(text || ''); }
 function fillTpl(tpl, vars) { const st = S.settings; const all = Object.assign({ complex: st.complexName, program: st.programName, org: st.orgName, currency: st.currency }, vars); return String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => all[k] != null ? all[k] : m); }
 function appBase() { return location.origin + location.pathname.replace(/index\.html$/, ''); }
-const regLink = () => appBase() + '?reg=1' + (S.server ? '&s=' + encodeURIComponent(S.server) : '');
-const parentLink = (st, view) => appBase() + '?p=' + st.parentToken + (view ? '&' + new URLSearchParams(Object.fromEntries(Object.entries(view).filter(([, v]) => v != null && v !== ''))).toString() : '') + (S.server ? '&s=' + encodeURIComponent(S.server) : '');
+const regLink = () => appBase() + '?reg=1' + serverParam();
+/* رابط قصير: ?p=الرمز&w=نوع-بنود-من-إلى  (رابط الخادم لا يُضاف إن كان هو خادم المجمع الافتراضي) */
+const VIEW_CODES = { hifz: 'h', review: 'r', far: 'b', noor: 'n', zad: 'z', cur: 'c', grade: 'g', errors: 'e', behavior: 's', note: 'm', notes: 'm', media: 'v', att: 'a', surahs: 'q', rank: 'k', level: 'l', exams: 'x', fees: 'f', subjects: 'j', total: 't', pct: 'p', quran: 'u', due: 'd', disc: 'o', paid: 'y', remaining: 'w', pays: 'i' };
+const VIEW_KINDS = { daily: 'd', period: 'p', absent: 'a', exam: 'e', fee: 'f' };
+const ymd = d => d ? d.replace(/^20/, '').replace(/-/g, '') : '';
+function encodeView(v) { const o = [...new Set(String(v.o || '').split(',').map(k => VIEW_CODES[k]).filter(Boolean))].join(''); return [VIEW_KINDS[v.v] || 'p', o, v.x ? '~' + v.x : ymd(v.f), v.x || v.t === v.f ? '' : ymd(v.t)].join('-').replace(/-+$/, ''); }
+function decodeView(w) {
+  const [k, o, a, b] = String(w).split('-'); const kind = Object.keys(VIEW_KINDS).find(x => VIEW_KINDS[x] === k) || 'period';
+  const rev = {}; Object.entries(VIEW_CODES).forEach(([key, c]) => { (rev[c] = rev[c] || []).push(key); });
+  const keys = (o || '').split('').flatMap(c => rev[c] || []);
+  const dt = s => s && /^\d{6}$/.test(s) ? '20' + s.slice(0, 2) + '-' + s.slice(2, 4) + '-' + s.slice(4, 6) : '';
+  return { v: kind, o: keys.join(','), x: a && a[0] === '~' ? a.slice(1) : '', f: a && a[0] !== '~' ? dt(a) : '', t: dt(b) || (a && a[0] !== '~' ? dt(a) : '') };
+}
+const serverParam = () => S.server && S.server !== window.DEFAULT_SERVER ? '&s=' + encodeURIComponent(S.server) : '';
+const parentLink = (st, view) => appBase() + '?p=' + st.parentToken + (view ? '&w=' + encodeView(view) : '') + serverParam();
 
 /* ——— الوصول للبيانات ——— */
 /* ——— الأعوام الدراسية: كل عام يغطي فترة تواريخ، والأعوام المغلقة تُعرض للاطلاع فقط ——— */

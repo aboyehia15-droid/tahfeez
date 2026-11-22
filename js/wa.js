@@ -121,7 +121,11 @@ function waCompose(kind, students, ctx = {}, title) {
     if ($('#wsave', m.el).checked) { const p = Object.assign({}, S.settings.waPrefs || {}); const c = Object.assign({}, o); delete c.extra; p[kind] = c; if (!viewingArchive()) saveSettings({ waPrefs: p }); }
     m.close();
     const items = list.map(s => ({ name: s.name, phone: s.guardianPhone, text: waBuild(kind, s, ctx, o), onSent: () => { if (kind === 'parent') { s.linkSentAt = Date.now(); save('students', s); } } }));
-    if (items.length === 1) { window.open(waLink(items[0].phone, items[0].text), '_blank'); items[0].onSent(); }
-    else waQueueDialog(items, title || K.title);
+    const go = () => { if (items.length === 1) { window.open(waLink(items[0].phone, items[0].text), '_blank'); items[0].onSent(); } else waQueueDialog(items, title || K.title); };
+    if (S.settings.shortLinks && !isLocal() && o.link) {
+      const urls = [...new Set(items.flatMap(it => it.text.match(/https?:\/\/\S*\?p=\S+/g) || []))];
+      toast('⏳ جاري اختصار الروابط…', 5000);
+      api('shorten', { urls }).then(r => { if (r.ok) items.forEach(it => Object.entries(r.map || {}).forEach(([u, sh]) => { it.text = it.text.split(u).join(sh); })); }).catch(() => {}).finally(go);
+    } else go();
   };
 }

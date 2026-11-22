@@ -60,7 +60,7 @@ function loadDemo() {
 /* ——— بدء التشغيل ——— */
 (function boot() {
   loadLocal();
-  const sp = URLQ.get('s');
+  const sp = URLQ.get('s') || ((URLQ.get('p') || URLQ.get('reg')) && !S.server && !localStorage.getItem('tz_local') ? window.DEFAULT_SERVER : '');
   if (sp && /^https:\/\/script\.google/.test(sp) && sp !== S.server) {
     S.server = sp;
     if (!URLQ.get('p') && !URLQ.get('reg')) { localStorage.setItem(LS.server, sp); history.replaceState(null, '', location.pathname + location.hash); }

@@ -302,6 +302,14 @@ function route_(r) {
     return { ok: true, text: txt };
   }
 
+  if (a === 'shorten') { // اختصار الروابط (اختياري) عبر is.gd
+    var out = {};
+    (r.urls || []).slice(0, 60).forEach(function (u) {
+      try { var res = UrlFetchApp.fetch('https://is.gd/create.php?format=simple&url=' + encodeURIComponent(u), { muteHttpExceptions: true }); var t = res.getContentText().trim(); if (res.getResponseCode() === 200 && /^https?:\/\//.test(t)) out[u] = t; } catch (e) {}
+    });
+    return { ok: true, map: out };
+  }
+
   if (a === 'sendWA') { // إرسال تلقائي عبر مزود واتساب (اختياري)
     var st4 = settings_();
     var inst = PropertiesService.getScriptProperties().getProperty('WA_INSTANCE') || st4.waInstance;

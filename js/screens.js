@@ -370,7 +370,7 @@ function viewClasses(v, sub) {
   } else {
     $('#addbtn').onclick = () => userForm();
     const us = T('users').slice().sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-    const loginLink = appBase() + (S.server ? '?s=' + encodeURIComponent(S.server) : '');
+    const loginLink = appBase() + (S.server && S.server !== window.DEFAULT_SERVER ? '?s=' + encodeURIComponent(S.server) : '');
     box.innerHTML = `${S.server ? `<div class="card"><b>🔑 رابط دخول المعلمين:</b> أرسله للمعلم مع اسم المستخدم وكلمة المرور ليثبّت التطبيق على جواله.<div class="row" style="margin-top:6px"><input class="inp grow" readonly dir="ltr" value="${esc(loginLink)}" style="font-size:12px"><button class="btn sm" id="cpl">📋 نسخ</button></div></div>` : '<div class="card" style="background:#fff8e1">في الوضع المحلي تُستخدم أسماء المعلمين للفصول والتقارير فقط. بعد الربط بالخادم يدخل كل معلم بحسابه ويرى فصوله فقط.</div>'}
       <div class="card" style="padding:4px 8px">${us.length ? us.map(u => `<div class="list-item"><div class="avatar" style="background:${colorOf(u.name)}">${initials(u.name)}</div><div style="flex:1"><b>${esc(u.name)}</b><div class="small muted">${{ admin: '👑 مدير', supervisor: '🧭 مشرف', teacher: '👨‍🏫 معلم' }[u.role] || ''} · ${esc(u.username || '')} ${u.phone ? '· <span dir="ltr">' + esc(u.phone) + '</span>' : ''} ${u.active === false ? '<span class="chip red">موقوف</span>' : ''}</div>
       <div class="row small">${T('classes').filter(c => c.teacherId === u.id).map(c => `<span class="chip">${esc(c.name)}</span>`).join('')}</div></div>
@@ -642,11 +642,12 @@ function viewSettings(v, sub) {
     box.innerHTML = `<div class="card"><h3>🎛️ تشغيل وإيقاف الخصائص</h3>${FEATS.map(([k, t]) => `<div class="toggle-row"><span>${t}</span><label class="switch"><input type="checkbox" data-f="${k}" ${f[k] ? 'checked' : ''}><span></span></label></div>`).join('')}
       <div class="toggle-row"><span>إظهار الرسوم لولي الأمر في صفحة الطالب</span><label class="switch"><input type="checkbox" id="psf" ${st.parentShowFees !== false ? 'checked' : ''}><span></span></label></div>
       <div class="toggle-row"><span>إظهار الإعفاء والخصومات (أخوة / خاص) لولي الأمر <span class="small muted">— عند الإيقاف يرى المبلغ المستحق فقط</span></span><label class="switch"><input type="checkbox" id="psd" ${st.parentShowDisc ? 'checked' : ''}><span></span></label></div>
+      <div class="toggle-row"><span>🔗 اختصار روابط أولياء الأمور أكثر (مثل is.gd/AbC12x) <span class="small muted">— يحتاج تحديث كود الخادم</span></span><label class="switch"><input type="checkbox" id="pshort" ${st.shortLinks ? 'checked' : ''}><span></span></label></div>
       <div class="toggle-row"><span>عرض ترتيب الطالب في فصله لولي الأمر</span><label class="switch"><input type="checkbox" id="psr" ${st.parentShowRank !== false ? 'checked' : ''}><span></span></label></div></div>
       <div class="card"><h3>📲 مزود الواتساب للإرسال الآلي (اختياري)</h3><p class="small muted">بدونه يعمل الإرسال بفتح الواتساب برسالة جاهزة لكل رقم. للإرسال الآلي الكامل اشترك في خدمة UltraMsg ثم ضع البيانات هنا (تعمل بعد الربط بالخادم).</p>
       <div class="grid g2"><div class="field"><label>Instance ID</label><input class="inp" id="wai" dir="ltr" value="${esc(st.waInstance || '')}"></div><div class="field"><label>Token</label><input class="inp" id="wat" dir="ltr" value="${esc(st.waToken || '')}"></div></div>
       <div class="toggle-row"><span>تفعيل الإرسال الآلي</span><label class="switch"><input type="checkbox" id="waa" ${st.waAuto ? 'checked' : ''}><span></span></label></div></div>`;
-    box.onchange = () => { const fe = {}; $$('[data-f]', box).forEach(i => fe[i.dataset.f] = i.checked); saveSettings({ features: fe, parentShowFees: $('#psf').checked, parentShowRank: $('#psr').checked, parentShowDisc: $('#psd').checked, waInstance: $('#wai').value.trim(), waToken: $('#wat').value.trim(), waAuto: $('#waa').checked }); toast('✔️ حُفظ'); };
+    box.onchange = () => { const fe = {}; $$('[data-f]', box).forEach(i => fe[i.dataset.f] = i.checked); saveSettings({ features: fe, parentShowFees: $('#psf').checked, parentShowRank: $('#psr').checked, shortLinks: $('#pshort').checked, parentShowDisc: $('#psd').checked, waInstance: $('#wai').value.trim(), waToken: $('#wat').value.trim(), waAuto: $('#waa').checked }); toast('✔️ حُفظ'); };
   }
   if (sub === 'zad') {
     const z = zadCurriculum();
@@ -684,7 +685,7 @@ function serverSettings(box) {
     <li>نشر ← نشر جديد ← تطبيق ويب ← التنفيذ: <b>أنا</b>، الوصول: <b>أي شخص</b> ← نشر.</li><li>انسخ رابط تطبيق الويب والصقه هنا:</li></ol>
     <div class="row"><input class="inp grow" id="surl" dir="ltr" placeholder="https://script.google.com/macros/s/…/exec"><button class="btn" id="conn">🔗 ربط</button></div><div id="sres"></div>`}</div>`;
   const sn = $('#syncnow'); if (sn) sn.onclick = () => pull().then(render);
-  const ul = $('#unlink'); if (ul) ul.onclick = async () => { if (await confirmBox('فصل التطبيق عن الخادم على هذا الجهاز؟ (تبقى نسخة محلية)')) { localStorage.removeItem(LS.server); S.server = ''; S.token = null; S.me = null; saveSession(); render(); } };
+  const ul = $('#unlink'); if (ul) ul.onclick = async () => { if (await confirmBox('فصل التطبيق عن الخادم على هذا الجهاز؟ (تبقى نسخة محلية)')) { localStorage.removeItem(LS.server); localStorage.setItem('tz_local', '1'); S.server = ''; S.token = null; S.me = null; saveSession(); render(); } };
   const cb = $('#conn'); if (cb) cb.onclick = async () => {
     const url = $('#surl').value.trim();
     if (/docs\.google\.com\/spreadsheets/.test(url)) return modal({ title: 'هذا رابط الجدول وليس رابط الخادم', body: '<p>الرابط المطلوب هو <b>رابط تطبيق الويب</b> الذي يظهر بعد النشر، ويبدأ بـ <span dir="ltr">https://script.google.com/macros/s/</span> وينتهي بـ <b dir="ltr">/exec</b></p><ol style="line-height:2"><li>في الجدول: <b>الإضافات ← Apps Script</b></li><li>الصق كود الخادم واحفظ، ثم شغّل الدالة <b>setup</b></li><li>اضغط <b>نشر ← نشر جديد</b> ← نوع: <b>تطبيق ويب</b> ← التنفيذ: <b>أنا</b> ← الوصول: <b>أي شخص</b> ← نشر</li><li>انسخ <b>رابط تطبيق الويب</b> (Web app URL) والصقه هنا</li></ol>', foot: false });
@@ -700,9 +701,9 @@ function serverSettings(box) {
           const data = {}; TABLE_NAMES.forEach(t => data[t] = S.data[t]);
           if (!data.settings.length) data.settings = [Object.assign({}, DEFAULT_SETTINGS, { updatedAt: Date.now() })];
           const b = await api('bootstrap', { admin, data }, url); if (!b.ok) return toast(b.error);
-          S.server = url; localStorage.setItem(LS.server, url); S.token = b.token; S.me = b.user; saveSession(); await pull(true); toast('✔️ تم الربط'); location.hash = '#/home';
+          S.server = url; localStorage.setItem(LS.server, url); localStorage.removeItem('tz_local'); S.token = b.token; S.me = b.user; saveSession(); await pull(true); toast('✔️ تم الربط'); location.hash = '#/home';
         };
-      } else { S.server = url; localStorage.setItem(LS.server, url); toast('سجّل الدخول'); render(); }
+      } else { S.server = url; localStorage.setItem(LS.server, url); localStorage.removeItem('tz_local'); toast('سجّل الدخول'); render(); }
     } catch (e) {
       let why = 'تعذر الاتصال بالخادم.';
       try { const t = await (await fetch(url, { redirect: 'follow' })).text(); if (/"app":"tahfeez"/.test(t)) { let j = {}; try { j = JSON.parse(t); } catch (x) {} why = j.error ? j.error : j.sheet === false ? 'الخادم لا يصل للجدول' : 'الخادم يعمل لكن لم تُمنح صلاحيات الجدول بعد ← في Apps Script اختر الدالة setup واضغط تشغيل ووافق على الصلاحيات، ثم نشر ← إدارة عمليات النشر ← تعديل ← إصدار جديد ← نشر. (' + e.message + ')'; } else if (/accounts\.google|ServiceLogin|signin/i.test(t)) why = 'الخادم يطلب تسجيل دخول Google ← اجعل «من يمكنه الوصول» = أي شخص (Anyone) وانشر إصداراً جديداً.'; else if (/doGet|Script function not found/i.test(t)) why = 'الكود غير محفوظ أو غير منشور ← احفظ الكود ثم انشر إصداراً جديداً.'; else why = 'الرد غير متوقع: ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160); } catch (e2) { why = 'لا يمكن الوصول للرابط (' + e.message + ') ← غالباً «من يمكنه الوصول» ليس «أي شخص»، أو الرابط منسوخ ناقصاً.'; }
@@ -717,7 +718,7 @@ function viewLogin(root) {
     <button class="btn ghost block" id="lx" style="margin-top:8px;font-size:12px">العمل محلياً بدون خادم</button></div></div>`;
   const go = async () => { const b = $('#lb'); b.disabled = true; b.textContent = '⏳'; try { const r = await api('login', { username: $('#lu').value.trim(), password: $('#lp').value }); if (!r.ok) throw new Error(r.error); S.token = r.token; S.me = r.user; saveSession(); await pull(true); location.hash = '#/home'; render(); } catch (e) { toast('⚠️ ' + e.message); } b.disabled = false; b.textContent = 'دخول'; };
   $('#lb').onclick = go; $('#lp').onkeydown = e => e.key === 'Enter' && go();
-  $('#lx').onclick = async () => { if (await confirmBox('فصل الربط بالخادم والعمل محلياً على هذا الجهاز؟', 'نعم', false)) { localStorage.removeItem(LS.server); S.server = ''; render(); } };
+  $('#lx').onclick = async () => { if (await confirmBox('فصل الربط بالخادم والعمل محلياً على هذا الجهاز؟', 'نعم', false)) { localStorage.removeItem(LS.server); localStorage.setItem('tz_local', '1'); S.server = ''; render(); } };
 }
 
 /* ——— استيراد حزمة بيانات (طلاب، معلمون، فصول، رسوم وإيصالات) ——— */
