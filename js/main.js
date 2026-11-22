@@ -65,7 +65,19 @@ function loadDemo() {
     S.server = sp;
     if (!URLQ.get('p') && !URLQ.get('reg')) { localStorage.setItem(LS.server, sp); history.replaceState(null, '', location.pathname + location.hash); }
   }
+  // الدخول المباشر برابط المعلم الشخصي (?k=...)
+  if (URLQ.get('k') && S.server) {
+    const k = URLQ.get('k'); history.replaceState(null, '', location.pathname + (URLQ.get('s') ? '?s=' + encodeURIComponent(URLQ.get('s')) : ''));
+    document.getElementById('app').innerHTML = '<div class="splash"><img src="assets/logo-ibntaymiyah.jpg"><div>⏳ جاري الدخول…</div></div>';
+    api('keyLogin', { k }).then(async r => {
+      if (!r.ok) { toast('⚠️ ' + r.error, 5000); render(); return; }
+      localStorage.removeItem('tz_local'); if (URLQ.get('s')) localStorage.setItem(LS.server, S.server); S.token = r.token; S.me = r.user; saveSession(); sessionStorage.setItem('tz_hello', r.user.name);
+      location.replace(location.pathname + '#/home'); location.reload();
+    }).catch(() => { toast('⚠️ تعذر الاتصال بالخادم — تحقق من الإنترنت', 5000); render(); });
+    return;
+  }
   render();
+  if (sessionStorage.getItem('tz_hello')) { toast('👋 أهلاً أستاذ ' + sessionStorage.getItem('tz_hello') + ' — تم الدخول', 3500); sessionStorage.removeItem('tz_hello'); }
   if (!URLQ.get('p') && !URLQ.get('reg') && S.token) pull(true).then(ok => { if (ok) { render(); autoEnableCurricula(); } });
   else if (!URLQ.get('p') && !URLQ.get('reg') && isLocal()) autoEnableCurricula();
   setInterval(() => { if (S.token && !document.hidden && !$('.modal-bg')) pull(true).then(ok => ok && !$('.modal-bg') && !location.hash.startsWith('#/tv') && render()); }, 120000);

@@ -389,13 +389,30 @@ function viewClasses(v, sub) {
     $('#addbtn').onclick = () => userForm();
     const us = T('users').slice().sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     const loginLink = appBase() + (S.server && S.server !== window.DEFAULT_SERVER ? '?s=' + encodeURIComponent(S.server) : '');
-    box.innerHTML = `${S.server ? `<div class="card"><b>🔑 رابط دخول المعلمين:</b> أرسله للمعلم مع اسم المستخدم وكلمة المرور ليثبّت التطبيق على جواله.<div class="row" style="margin-top:6px"><input class="inp grow" readonly dir="ltr" value="${esc(loginLink)}" style="font-size:14px"><button class="btn sm" id="cpl">📋 نسخ</button></div></div>` : '<div class="card" style="background:#fff8e1">في الوضع المحلي تُستخدم أسماء المعلمين للفصول والتقارير فقط. بعد الربط بالخادم يدخل كل معلم بحسابه ويرى فصوله فقط.</div>'}
+    box.innerHTML = `${S.server ? `<div class="card"><b>🔑 دخول المعلمين:</b> أسهل طريقة: زر <b>«💬 رابط الدخول»</b> بجانب كل معلم — يرسل له رابطاً شخصياً يدخل به مباشرة بلمسة دون اسم مستخدم أو كلمة مرور. أو أرسل هذا الرابط العام مع اسم المستخدم وكلمة المرور:<div class="row" style="margin-top:6px"><input class="inp grow" readonly dir="ltr" value="${esc(loginLink)}" style="font-size:14px"><button class="btn sm" id="cpl">📋 نسخ</button></div></div>` : '<div class="card" style="background:#fff8e1">في الوضع المحلي تُستخدم أسماء المعلمين للفصول والتقارير فقط. بعد الربط بالخادم يدخل كل معلم بحسابه ويرى فصوله فقط.</div>'}
       <div class="card" style="padding:4px 8px">${us.length ? us.map(u => `<div class="list-item"><div class="avatar" style="background:${colorOf(u.name)}">${initials(u.name)}</div><div style="flex:1"><b>${esc(u.name)}</b><div class="small muted">${{ admin: '👑 مدير', supervisor: '🧭 مشرف', teacher: '👨‍🏫 معلم' }[u.role] || ''} · ${esc(u.username || '')} ${u.phone ? '· <span dir="ltr">' + esc(u.phone) + '</span>' : ''} ${u.active === false ? '<span class="chip red">موقوف</span>' : ''}</div>
       <div class="row small">${T('classes').filter(c => c.teacherId === u.id).map(c => `<span class="chip">${esc(c.name)}</span>`).join('')}</div></div>
-      ${u.phone && S.server ? `<a class="btn sm wa" target="_blank" href="${waLink(u.phone, 'السلام عليكم أستاذ ' + u.name + '\nرابط دخول منصة متابعة الحلقات:\n' + loginLink + '\nاسم المستخدم: ' + (u.username || ''))}">💬</a>` : ''}<button class="btn sm light" data-u="${u.id}">✏️</button></div>`).join('') : '<div class="empty"><span class="e">👨‍🏫</span>أضف المعلمين ليتم ربطهم بالفصول</div>'}</div>`;
+      ${S.server && (u.role !== 'admin' || isAdmin()) ? `${u.phone ? `<button class="btn sm wa" data-wal="${u.id}" title="إرسال رابط الدخول المباشر بالواتساب">💬 رابط الدخول</button>` : ''}<button class="btn sm light" data-kcopy="${u.id}" title="نسخ رابط الدخول المباشر">🔗</button>` : ''}<button class="btn sm light" data-u="${u.id}">✏️</button></div>`).join('') : '<div class="empty"><span class="e">👨‍🏫</span>أضف المعلمين ليتم ربطهم بالفصول</div>'}</div>`;
     const cpl = $('#cpl'); if (cpl) cpl.onclick = () => copyText(loginLink);
-    box.onclick = e => { const b = e.target.closest('[data-u]'); if (b) userForm(byId('users', b.dataset.u)); };
+    box.onclick = async e => {
+      const b = e.target.closest('[data-u]'); if (b) return userForm(byId('users', b.dataset.u));
+      const w = e.target.closest('[data-wal]'), kc = e.target.closest('[data-kcopy]'); if (!w && !kc) return;
+      const u = byId('users', (w || kc).dataset.wal || (w || kc).dataset.kcopy);
+      const win = w ? window.open('', '_blank') : null; // يُفتح فوراً حتى لا يمنعه الجوال
+      try {
+        const link = await directLink(u);
+        if (kc) return copyText(link);
+        const msg = 'السلام عليكم أستاذ ' + u.name + '\nهذا رابط دخولك المباشر إلى منصة متابعة الحلقات (خاص بك فلا تشاركه):\n' + link + '\n\nاضغطه مرة واحدة فتدخل مباشرة، ثم اختر «📲 تثبيت التطبيق» ليبقى على شاشة جوالك.';
+        if (win) win.location.href = waLink(u.phone, msg); else window.open(waLink(u.phone, msg), '_blank');
+      } catch (er) { if (win) win.close(); toast('⚠️ ' + er.message); }
+    };
   }
+}
+/* رابط الدخول المباشر للمعلم: يدخل بلمسة دون كتابة اسم المستخدم وكلمة المرور */
+async function directLink(u, renew) {
+  toast('⏳ جاري تجهيز الرابط…', 2000);
+  const r = await api('makeKey', { id: u.id, renew: !!renew }); if (!r.ok) throw new Error(r.error || 'تعذر إنشاء الرابط');
+  return appBase() + '?k=' + r.key + serverParam().replace('&', '&');
 }
 function classForm(c) {
   c = c || { subjects: ['quran', 'noor', 'zad'].concat(curricula().map(x => x.id)), track: 'mixed' };
@@ -433,7 +450,8 @@ function userForm(u) {
     <div class="field"><label>اسم المستخدم للدخول</label><input class="inp" id="uu" dir="ltr" value="${esc(u.username || '')}"></div>
     <div class="field"><label>${u.id ? 'كلمة مرور جديدة (اتركها فارغة لعدم التغيير)' : 'كلمة المرور'}</label><input class="inp" id="upw" dir="ltr" type="text"></div>
     <div class="toggle-row"><span>الحساب مفعّل</span><label class="switch"><input type="checkbox" id="ua" ${u.active !== false ? 'checked' : ''}><span></span></label></div></div>`,
-    foot: `<button class="btn" data-ok>💾 حفظ</button>${u.id && isAdmin() ? '<button class="btn red" data-del>🗑️ حذف</button>' : ''}` });
+    foot: `<button class="btn" data-ok>💾 حفظ</button>${u.id && S.server ? '<button class="btn light" data-renew title="الرابط القديم يتوقف عن العمل">🔄 تجديد رابط الدخول المباشر</button>' : ''}${u.id && isAdmin() ? '<button class="btn red" data-del>🗑️ حذف</button>' : ''}` });
+  const rn = $('[data-renew]', m.el); if (rn) rn.onclick = async () => { if (!(await confirmBox('تجديد رابط الدخول المباشر لـ ' + u.name + '؟ الرابط القديم يتوقف عن العمل، وتحتاج إرسال الجديد له.'))) return; try { const l = await directLink(u, true); copyText(l); toast('✔️ تم التجديد ونُسخ الرابط الجديد'); } catch (e) { toast('⚠️ ' + e.message); } };
   $('[data-ok]', m.el).onclick = () => {
     const name = $('#un', m.el).value.trim(); if (!name) return toast('اكتب الاسم');
     const username = $('#uu', m.el).value.trim(); const pw = $('#upw', m.el).value;
@@ -738,7 +756,7 @@ function serverSettings(box) {
 }
 function viewLogin(root) {
   root.innerHTML = `<div class="login"><div class="box"><div class="lg"><img src="${logoR()}"><img src="${logoL()}"></div><h2 style="color:var(--teal);margin:6px 0">منصة متابعة الحلقات</h2><p class="muted small">${esc(S.settings.complexName)}</p>
-    <input class="inp" id="lu" placeholder="اسم المستخدم (رقم جوالك)" dir="ltr" autocapitalize="off" autocorrect="off" autocomplete="username" inputmode="text" style="margin-bottom:8px"><div style="position:relative;margin-bottom:12px"><input class="inp" id="lp" type="password" placeholder="كلمة المرور" dir="ltr" autocapitalize="off" autocorrect="off" autocomplete="current-password"><button type="button" id="lpe" title="إظهار كلمة المرور" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:20px;cursor:pointer">👁️</button></div><div id="lerr" hidden style="color:var(--red);font-size:15px;margin:-4px 0 10px;text-align:center"></div><button class="btn block" id="lb">دخول</button>
+    <input class="inp" id="lu" placeholder="اسم المستخدم (رقم جوالك)" dir="ltr" autocapitalize="off" autocorrect="off" autocomplete="username" inputmode="text" style="margin-bottom:8px"><div style="position:relative;margin-bottom:12px"><input class="inp" id="lp" type="password" placeholder="كلمة المرور" dir="ltr" style="padding-left:44px" autocapitalize="off" autocorrect="off" autocomplete="current-password"><button type="button" id="lpe" title="إظهار كلمة المرور" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:20px;cursor:pointer">👁️</button></div><div id="lerr" hidden style="color:var(--red);font-size:15px;margin:-4px 0 10px;text-align:center"></div><button class="btn block" id="lb">دخول</button>
     ${isStandalone() ? '' : '<button class="btn light block" style="margin-top:8px" onclick="installNow()">📲 تثبيت التطبيق على جهازك</button>'}
     ${URLQ.get('local') ? '<button class="btn ghost block" id="lx" style="margin-top:8px;font-size:14px">العمل محلياً بدون خادم</button>' : ''}</div></div>`;
   const go = async () => { const b = $('#lb'); b.disabled = true; b.textContent = '⏳'; try { const r = await api('login', { username: $('#lu').value.trim(), password: $('#lp').value }); if (!r.ok) throw new Error(r.error); S.token = r.token; S.me = r.user; saveSession(); await pull(true); location.hash = '#/home'; render(); } catch (e) { const msg = e instanceof TypeError ? 'تعذر الاتصال بالخادم — تحقق من الإنترنت ثم أعد المحاولة' : e.message; toast('⚠️ ' + msg, 4000); const le = $('#lerr'); if (le) { le.textContent = '⚠️ ' + msg; le.hidden = false; } } b.disabled = false; b.textContent = 'دخول'; };

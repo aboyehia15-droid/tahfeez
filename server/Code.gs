@@ -25,7 +25,7 @@ var TABLES = {
   settings: ['id', 'updatedAt', 'json'],
   outbox:   ['id', 'by', 'studentId', 'status', 'createdAt', 'updatedAt', 'json'] // رسائل المعلمين المحوّلة للإدارة لترسلها من واتسابها
 };
-var SECRET_FIELDS = ['passHash'];
+var SECRET_FIELDS = ['passHash', 'loginKey'];
 
 function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -191,6 +191,15 @@ function route_(r) {
     return { ok: true, token: t, user: stripSecrets_([u])[0] };
   }
 
+  if (a === 'keyLogin') { // الدخول المباشر برابط شخصي للمعلم
+    var k = String(r.k || '').trim();
+    var uk = k.length >= 16 ? readAll_('users').filter(function (x) { return x.loginKey && x.loginKey === k && x.active !== false; })[0] : null;
+    if (!uk) return { ok: false, error: 'رابط الدخول غير صالح أو تم تجديده — اطلب رابطاً جديداً من الإدارة' };
+    var tk2 = Utilities.getUuid();
+    PropertiesService.getScriptProperties().setProperty('S_' + tk2, uk.id);
+    return { ok: true, token: tk2, user: stripSecrets_([uk])[0] };
+  }
+
   if (a === 'regInfo') {
     var st = settings_();
     return { ok: true, settings: publicSettings_(st), classes: readAll_('classes').map(function (c) { return { id: c.id, name: c.name, track: c.track }; }) };
@@ -269,6 +278,7 @@ function route_(r) {
         var o = old.filter(function (x) { return x.id === u.id; })[0];
         if (u.password) { u.passHash = hash_(u.password); delete u.password; }
         else if (o) u.passHash = o.passHash;
+        if (o && o.loginKey && !u.loginKey) u.loginKey = o.loginKey; // رابط الدخول المباشر يبقى كما هو
       });
     }
     upsert_(r.table, rows);
@@ -291,6 +301,18 @@ function route_(r) {
     var file = (r.folder ? subFolder_(r.folder) : receiptsFolder_()).createFile(blob);
     try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
     return { ok: true, url: 'https://drive.google.com/file/d/' + file.getId() + '/view', id: file.getId() };
+  }
+
+  if (a === 'makeKey') { // إنشاء/تجديد رابط الدخول المباشر لمستخدم (للمدير والمشرف)
+    if (me.role !== 'admin' && me.role !== 'supervisor') return { ok: false, error: 'للإدارة فقط' };
+    var lock = LockService.getScriptLock(); lock.waitLock(20000);
+    try {
+      var all = readAll_('users'); var tu = all.filter(function (x) { return x.id === r.id; })[0];
+      if (!tu) return { ok: false, error: 'المستخدم غير موجود' };
+      if (tu.role === 'admin' && me.role !== 'admin') return { ok: false, error: 'للمدير فقط' };
+      if (!tu.loginKey || r.renew) { tu.loginKey = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '').slice(0, 32); tu.updatedAt = Date.now(); upsert_('users', [tu]); }
+      return { ok: true, key: tu.loginKey };
+    } finally { lock.releaseLock(); }
   }
 
   if (a === 'setSecret') { // حفظ مفتاح Claude API في خصائص السكربت (لا يظهر لأي مستخدم)
