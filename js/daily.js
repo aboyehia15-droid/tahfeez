@@ -99,12 +99,13 @@ function recordEditor(s, date) {
     foot: `<button class="btn" data-save>💾 حفظ</button>${next ? `<button class="btn gold" data-next>💾 حفظ والتالي ◀</button>` : ''}<button class="btn wa" data-wa title="إرسال تقرير اليوم">💬</button><span style="flex:1"></span>${orig ? '<button class="btn ghost" data-del>🗑️</button>' : ''}` });
 
   const RECSUBS = ['hifz', 'review', 'far', 'noor', 'zad'];
-  const sec = (id, title, inner, mic) => `<div class="sec" id="sec-${id}"><div class="sec-h">${title}<span class="sp"></span>${RECSUBS.includes(id) ? recButtons(id) : ''}${mic && f.voice && speechSupported() ? `<button type="button" class="mic" data-mic="${id}" title="إدخال صوتي">🎤</button>` : ''}</div>${inner}${RECSUBS.includes(id) ? `<div data-mlist="${id}">${mediaListHTML(r.media, true, id)}</div>` : ''}</div>`;
+  const sec = (id, title, inner, mic) => `<div class="sec" id="sec-${id}"><div class="sec-h">${title}<span class="sp"></span>${RECSUBS.includes(id) ? recButtons(id) : ''}${mic && f.voice && speechSupported() ? `<button type="button" class="mic" data-mic="${id}" title="إدخال صوتي">🎤</button>` : ''}</div>${inner}${RECSUBS.includes(id) ? `<div class="sub-errbox" data-eb="${id}"></div>` : ''}${RECSUBS.includes(id) ? `<div data-mlist="${id}">${mediaListHTML(r.media, true, id)}</div>` : ''}</div>`;
   body.innerHTML = `
     <div class="sec"><div class="sec-h">الحضور</div><div class="att" id="eatt" style="flex-wrap:wrap">${Object.entries(ATT).map(([k, [t, cl]]) => `<button class="${cl} ${r.att === k ? 'on' : ''}" data-att="${k}" style="padding:8px 16px;font-size:14px">${t}</button>`).join('')}</div></div>
     <div id="eb"></div>`;
   const eb = $('#eb', body);
   const drawBody = () => {
+    syncCurErrs();
     if (r.att === 'a' || r.att === 'e') { eb.innerHTML = `<div class="sec">${r.att === 'a' ? '❌ الطالب غائب' : 'ℹ️ الطالب مستأذن'} — <span class="muted">لا يُسجَّل له حفظ أو مراجعة.</span><div class="field" style="margin-top:8px"><label>ملاحظة (اختياري)</label><textarea class="inp" id="enote">${esc(r.note || '')}</textarea></div></div>`; $('#enote', eb).oninput = e => r.note = e.target.value; return; }
     let h = '';
     if (subj.includes('quran')) {
@@ -130,7 +131,6 @@ function recordEditor(s, date) {
       h += sec('zadRev', '🔁 مراجعة زاد الطفل', `<div class="small muted" style="margin-bottom:6px">اختر ما راجعه الطالب من الآداب والأذكار والأحاديث…</div><div data-mrev="zad"></div><div style="margin-top:8px">${gradeButtons(r.zadRev.grade, 'zadRev')}</div>`);
     }
     window.DAILY_MEDIA = r.media; window.DAILY_REV = r.curRev; subj.filter(isCur).forEach(cid => { h += curEditorHTML(cid, r.cur[cid], s.id, date); });
-    h += sec('errs', '✏️ الأخطاء والتصويب', `<div class="small muted" style="margin-bottom:6px">${subj.includes('quran') ? 'في جزء عم: اضغط على الكلمة الخاطئة في نص الآيات أعلاه لتسجيلها. ' : ''}أو أضف الخطأ يدوياً:</div><div class="err-list" id="elist"></div><button class="btn sm light" id="eadd">➕ إضافة خطأ</button>`);
     h += `<div class="sec"><div class="sec-h">🎙️ تسجيل عام<span class="sp"></span>${recButtons('')}</div><div id="emedia">${mediaListHTML(r.media, true, '') || '<div class="small muted">لكل مادة زرّا 🎙️ و🎥 في رأسها لتسجيل تسميعها، وهنا تسجيل عام لليوم. اختر «إرسال لولي الأمر» ليظهر في صفحة ابنه تحت المادة.</div>'}</div></div>`;
     h += sec('note', '📝 ملاحظات المعلم', `${f.behavior ? `<div class="row" style="margin-bottom:8px"><span>السلوك والانضباط:</span><span id="beh">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-b="${n}" style="border:0;background:none;font-size:26px;cursor:pointer;color:${(r.behavior || 0) >= n ? '#e2b93b' : '#ddd'}">★</button>`).join('')}</span></div>` : ''}<textarea class="inp" id="enote" placeholder="ملاحظة تظهر لولي الأمر في صفحة الطالب">${esc(r.note || '')}</textarea>
       <div class="row small" style="margin-top:6px">${['أحسنت، ممتاز 👏', 'يحتاج مراجعة في البيت', 'تحسن ملحوظ', 'يحتاج تركيزاً أكثر', 'نرجو الحرص على الحضور مبكراً'].map(t => `<button type="button" class="chip" data-qn="${t}" style="border:0;cursor:pointer">${t}</button>`).join('')}</div>`);
@@ -195,19 +195,48 @@ function recordEditor(s, date) {
     $('.noor-items', host).ondblclick = e => { const b = e.target.closest('button'); if (b) toggleErr(+b.dataset.n); };
     $$('.noor-items button', host).forEach(b => { b.addEventListener('touchstart', () => { pressT = setTimeout(() => { b._long = true; toggleErr(+b.dataset.n); }, 550); }, { passive: true }); b.addEventListener('touchend', () => clearTimeout(pressT)); });
   }
-  function drawErrs() {
-    const host = $('#elist', eb); if (!host) return;
-    host.innerHTML = r.errors.map((e, i) => { const where = e.sub === 'noor' ? `النورانية د${e.lesson}: «${esc(e.word || e.item)}»` : e.sub === 'zad' ? 'زاد الطفل' : `${e.sub === 'review' ? 'مراجعة' : e.sub === 'far' ? 'مراجعة بعيدة' : 'حفظ'} — ${Q.names[e.s - 1] || ''} ${e.a || ''}${e.word ? ': «' + esc(e.word) + '»' : ''}`; return `<div class="e ${e.fixed ? 'fixed' : ''}"><div style="flex:1"><div class="small"><b>${where}</b></div><div class="row" style="margin-top:4px"><select class="inp" data-et="${i}" style="width:auto;font-size:12px;padding:5px">${ERR_TYPES.map(t => `<option ${e.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><input class="inp grow" data-en="${i}" placeholder="التصويب / ملاحظة" value="${esc(e.note || '')}" style="font-size:13px;padding:6px"></div></div><label class="small row" style="white-space:nowrap"><input type="checkbox" data-ef="${i}" ${e.fixed ? 'checked' : ''}> صُوِّب</label><button type="button" class="btn sm ghost" data-ed="${i}">✕</button></div>`; }).join('') || '<div class="small muted">لا توجد أخطاء مسجلة ✨</div>';
-    host.oninput = e => { const t = e.target; if (t.dataset.et) r.errors[+t.dataset.et].type = t.value; if (t.dataset.en) r.errors[+t.dataset.en].note = t.value; };
-    host.onchange = e => { const t = e.target; if (t.dataset.ef) { r.errors[+t.dataset.ef].fixed = t.checked; drawErrs(); ['hifz', 'review', 'far'].forEach(drawAyahs); drawNoor(); } };
-    host.onclick = e => { const d = e.target.closest('[data-ed]'); if (d) { r.errors.splice(+d.dataset.ed, 1); drawErrs(); ['hifz', 'review', 'far'].forEach(drawAyahs); drawNoor(); } };
+  function syncCurErrs() {
+    r.errors = r.errors || [];
+    Object.keys(r.cur || {}).forEach(cid => {
+      const x = r.cur[cid], c = curById(cid); if (!c) return; const L = x && x.lesson ? c.lessons[x.lesson - 1] : null;
+      r.errors = r.errors.filter(e => !(e.sub === cid && e.item != null && !(L && e.lesson == x.lesson && (x.errs || []).includes(e.item))));
+      if (L) (x.errs || []).forEach(i => { if (!r.errors.some(e => e.sub === cid && e.lesson == x.lesson && e.item === i)) r.errors.push({ id: uid('e'), sub: cid, lesson: x.lesson, item: i, word: L.items[i], type: 'يحتاج تدريباً', note: '' }); });
+    });
+    r.errors = r.errors.filter(e => !(isCur(e.sub) && e.item != null && !(r.cur[e.sub] && r.cur[e.sub].lesson)));
   }
-  function addErrorManual() {
-    const subs = []; if (subj.includes('quran')) subs.push(['hifz', 'الحفظ'], ['review', 'المراجعة'], ['far', 'المراجعة البعيدة']); if (subj.includes('noor')) subs.push(['noor', 'النورانية']); if (subj.includes('zad')) subs.push(['zad', 'زاد الطفل']);
-    const mm = modal({ title: 'إضافة خطأ', body: `<div class="field"><label>المادة</label><select class="inp" id="xs">${subs.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></div><div id="xw"></div><div class="field"><label>نوع الخطأ</label><select class="inp" id="xt">${ERR_TYPES.map(t => `<option>${t}</option>`).join('')}</select></div><div class="field"><label>الخطأ والتصويب</label><input class="inp" id="xn" placeholder="مثال: قرأ «الرحيم» بدل «الرحمن»"></div>`, foot: '<button class="btn" data-ok>إضافة</button>' });
-    const dw = () => { const k = $('#xs', mm.el).value; const rg = r[k]; if ((k === 'hifz' || k === 'review' || k === 'far') && rg && rg.s1) { const set = Q.ayahSet(rg); $('#xw', mm.el).innerHTML = `<div class="field"><label>الآية</label><select class="inp" id="xa">${set.map(kk => { const [ss, aa] = Q.absToSA(kk); return `<option value="${ss}|${aa}">${Q.names[ss - 1]} ${aa}</option>`; }).join('')}</select></div>`; } else $('#xw', mm.el).innerHTML = ''; };
-    dw(); $('#xs', mm.el).onchange = dw;
-    $('[data-ok]', mm.el).onclick = () => { const k = $('#xs', mm.el).value; const e = { id: uid('e'), sub: k, type: $('#xt', mm.el).value, note: $('#xn', mm.el).value }; const xa = $('#xa', mm.el); if (xa) { const [ss, aa] = xa.value.split('|').map(Number); e.s = ss; e.a = aa; } if (k === 'noor') { e.lesson = r.noor.lesson; } r.errors.push(e); mm.close(); drawErrs(); };
+  const typesFor = sub => ['hifz', 'review', 'far'].includes(sub) ? ERR_TYPES : sub === 'noor' ? ['خطأ في الحرف', 'خطأ في الحركة', 'خطأ في المد', 'نسيان', 'تردد', 'تلقين'] : ['يحتاج تدريباً', 'نسيان', 'خطأ في النطق', 'خطأ في الكتابة', 'خطأ في الحفظ', 'تردد', 'تلقين'];
+  const HINT = { hifz: 'اضغط على الكلمة الخاطئة في نص الآيات أعلاه، أو أضف الخطأ يدوياً.', review: 'اضغط على الكلمة الخاطئة في نص الآيات أعلاه، أو أضف الخطأ يدوياً.', far: 'اضغط على الكلمة الخاطئة في نص الآيات أعلاه، أو أضف الخطأ يدوياً.', noor: 'اضغط مرتين على البند الخاطئ (أو فعّل وضع تحديد الأخطاء)، أو أضف الخطأ يدوياً.' };
+  function drawErrs() {
+    $$('[data-eb]', eb).forEach(host => {
+      const sub = host.dataset.eb; const list = r.errors.map((e, i) => [e, i]).filter(([e]) => e.sub === sub);
+      const T = typesFor(sub);
+      host.innerHTML = `<div class="sub-errs-ed"><div class="row small" style="margin-bottom:4px"><b style="color:#b4232f">✏️ الأخطاء والتصويب${list.length ? ` (${list.filter(([e]) => !e.fixed).length}/${list.length})` : ''}</b><span style="flex:1"></span><button type="button" class="btn sm light" data-eadd="${sub}">➕ إضافة خطأ</button></div>
+        ${list.length ? `<div class="err-list">${list.map(([e, i]) => `<div class="e ${e.fixed ? 'fixed' : ''}"><div style="flex:1"><div class="small"><b>${errPlace(e) || '—'}</b></div><div class="row" style="margin-top:4px"><select class="inp" data-et="${i}" style="width:auto;font-size:12px;padding:5px">${(T.includes(e.type) || !e.type ? T : [e.type].concat(T)).map(t => `<option ${e.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><input class="inp grow" data-en="${i}" placeholder="التصويب / ملاحظة" value="${esc(e.note || '')}" style="font-size:13px;padding:6px"></div></div><label class="small row" style="white-space:nowrap"><input type="checkbox" data-ef="${i}" ${e.fixed ? 'checked' : ''}> صُوِّب</label><button type="button" class="btn sm ghost" data-ed="${i}">✕</button></div>`).join('')}</div>` : `<div class="small muted">${HINT[sub] || (isCur(sub) ? 'اضغط مرتين على البند الذي أخطأ فيه (أو فعّل وضع تحديد الأخطاء)، أو أضف الخطأ يدوياً.' : 'لا توجد أخطاء — أضف الخطأ يدوياً إن وُجد.')}</div>`}</div>`;
+      host.oninput = e => { const t = e.target; if (t.dataset.et) r.errors[+t.dataset.et].type = t.value; if (t.dataset.en) r.errors[+t.dataset.en].note = t.value; };
+      host.onchange = e => { const t = e.target; if (t.dataset.ef) { r.errors[+t.dataset.ef].fixed = t.checked; redrawErrs(); } };
+      host.onclick = e => {
+        const d = e.target.closest('[data-ed]'); if (d) { const er = r.errors[+d.dataset.ed]; if (isCur(er.sub) && er.item != null && r.cur[er.sub]) r.cur[er.sub].errs = (r.cur[er.sub].errs || []).filter(v => v !== er.item); r.errors.splice(+d.dataset.ed, 1); if (isCur(er.sub)) drawBody(); else redrawErrs(); return; }
+        const ad = e.target.closest('[data-eadd]'); if (ad) addErrorManual(ad.dataset.eadd);
+      };
+    });
+  }
+  function redrawErrs() { drawErrs(); ['hifz', 'review', 'far'].forEach(drawAyahs); drawNoor(); }
+  function addErrorManual(k) {
+    let pick = '';
+    if (['hifz', 'review', 'far'].includes(k) && hasSeg(r[k])) { const set = segAyahs(r[k]); pick = `<div class="field"><label>الآية</label><select class="inp" id="xa">${set.map(kk => { const [ss, aa] = Q.absToSA(kk); return `<option value="${ss}|${aa}">${Q.names[ss - 1]} ${aa}</option>`; }).join('')}</select></div>`; }
+    else if (k === 'noor' && r.noor && r.noor.lesson) { const segsN = noorSegs(r.noor); pick = `<div class="field"><label>البند</label><select class="inp" id="xi"><option value="">— عام —</option>${segsN.map(g => { const N = NOORANIA[g.lesson - 1]; return N.items.map((it, j) => `<option value="${g.lesson}|${j + 1}">د${g.lesson}: ${esc(it)}</option>`).join(''); }).join('')}</select></div>`; }
+    else if (k === 'zad' && (r.zad || []).length) pick = `<div class="field"><label>البند</label><select class="inp" id="xz">${r.zad.map(z => `<option>${esc(z.item)}</option>`).join('')}</select></div>`;
+    else if (isCur(k) && r.cur[k] && r.cur[k].lesson) { const c = curById(k); const ls = curSegs(r.cur[k]); pick = `<div class="field"><label>البند</label><select class="inp" id="xc"><option value="">— عام —</option>${ls.map(g => { const L = c.lessons[g.lesson - 1] || { items: [] }; return L.items.map((it, j) => `<option value="${g.lesson}|${j}">${esc(curShort(L.t))}: ${esc(it)}</option>`).join(''); }).join('')}</select></div>`; }
+    const T = typesFor(k);
+    const mm = modal({ title: '✏️ إضافة خطأ — ' + esc(errSubName(k)), body: `${pick}<div class="field"><label>نوع الخطأ</label><select class="inp" id="xt">${T.map(t => `<option>${t}</option>`).join('')}</select></div><div class="field"><label>الخطأ والتصويب</label><input class="inp" id="xn" placeholder="${['hifz', 'review', 'far'].includes(k) ? 'مثال: قرأ «الرحيم» بدل «الرحمن»' : 'مثال: نطق الحرف خطأ، والصواب…'}"></div>`, foot: '<button class="btn" data-ok>إضافة</button>' });
+    $('[data-ok]', mm.el).onclick = () => {
+      const e = { id: uid('e'), sub: k, type: $('#xt', mm.el).value, note: $('#xn', mm.el).value };
+      const xa = $('#xa', mm.el); if (xa) { const [ss, aa] = xa.value.split('|').map(Number); e.s = ss; e.a = aa; }
+      const xi = $('#xi', mm.el); if (k === 'noor') { e.lesson = r.noor.lesson; if (xi && xi.value) { const [l, n] = xi.value.split('|').map(Number); e.lesson = l; e.item = n; e.word = NOORANIA[l - 1].items[n - 1]; } }
+      const xz = $('#xz', mm.el); if (xz) e.word = xz.value;
+      const xc = $('#xc', mm.el); if (isCur(k) && r.cur[k]) { e.lesson = r.cur[k].lesson; if (xc && xc.value) { const [l, j] = xc.value.split('|').map(Number); e.lesson = l; e.word = curById(k).lessons[l - 1].items[j]; if (l == r.cur[k].lesson) { const x = r.cur[k]; x.errs = (x.errs || []).filter(v => v !== j).concat([j]); x.items = (x.items || []).filter(v => v !== j); e.item = j; } } }
+      r.errors.push(e); mm.close(); if (isCur(k)) drawBody(); else redrawErrs();
+    };
   }
   drawBody();
   // أحداث
@@ -268,9 +297,10 @@ function recordEditor(s, date) {
     const zd = t.closest('[data-zdel]'); if (zd) { const [cat, ...it] = zd.dataset.zdel.split('|'); r.zad = r.zad.filter(z => !(z.cat === cat && z.item === it.join('|'))); drawBody(); return; }
     const bh = t.closest('[data-b]'); if (bh) { r.behavior = r.behavior == +bh.dataset.b ? 0 : +bh.dataset.b; $$('#beh button', eb).forEach(b => b.style.color = (r.behavior || 0) >= +b.dataset.b ? '#e2b93b' : '#ddd'); return; }
     const qn = t.closest('[data-qn]'); if (qn) { r.note = (r.note ? r.note + ' — ' : '') + qn.dataset.qn; $('#enote', eb).value = r.note; return; }
-    if (t.id === 'eadd') addErrorManual();
+    
   });
   const doSave = () => {
+    syncCurErrs();
     ['hifz', 'review', 'far'].forEach(k => { const x = r[k]; if (!x) return; x.extra = (x.extra || []).filter(g => g && g.s1); x.extra.forEach(g => { g.s2 = g.s2 || g.s1; g.pages = +Q.pagesBetween(g.s1, g.a1, g.s2, g.a2).toFixed(3); }); if (!x.s1 && x.extra.length) { const f0 = x.extra.shift(); Object.assign(x, { s1: f0.s1, a1: f0.a1, s2: f0.s2, a2: f0.a2 }); } if (!x.extra.length) delete x.extra; if (hasSeg(x)) { x.s2 = x.s2 || x.s1; x.pages = +segPages(x).toFixed(3); } else delete r[k]; });
     if (r.noor) { r.noor.extra = (r.noor.extra || []).filter(e => e.lesson); if (!r.noor.lesson && r.noor.extra.length) Object.assign(r.noor, r.noor.extra.shift()); if (!r.noor.extra.length) delete r.noor.extra; }
     if (r.noor && !r.noor.lesson) delete r.noor; if (r.noor) delete r.noor._picked;

@@ -96,12 +96,13 @@ function parentDay(r, subj) {
   if (r.att === 'a') return '<div class="ln"><span class="chip red">غائب</span></div>' + (note ? `<div class="ln">${note}</div>` : '');
   if (r.att === 'e') return '<div class="ln"><span class="chip blue">مستأذن</span></div>';
   /* أخطاء كل مادة تظهر تحتها مباشرة */
-  const errsOf = (sub, rng) => {
+  const ERR = recErrs(r);
+  const errsOf = (sub, rng, pred) => {
     if (!PF('errors')) return '';
-    const es = (r.errors || []).filter(e => e.sub === sub && (sub !== 'noor' || !r.noor || e.lesson == r.noor.lesson || !e.lesson));
+    const es = ERR.filter(e => e.sub === sub && (!pred || pred(e)));
     if (!es.length) return '';
-    let h = `<div class="sub-errs">${es.map(e => `<div class="small">${e.fixed ? '✅' : '❌'} ${sub === 'noor' ? '«' + esc(e.word || '') + '»' : (Q.names[e.s - 1] || '') + ' ' + (e.a || '') + (e.word ? ' «' + esc(e.word) + '»' : '')} — ${esc(e.type || '')}${e.note ? ': ' + esc(e.note) : ''}</div>`).join('')}`;
-    if (rng && es.some(e => e.word)) { const box = segAyahBoxes(rng, es.filter(e => e.word)); if (box) h += box.split('class="ayah-box"').join('class="ayah-box" style="font-size:20px;max-height:180px;margin-top:4px"'); }
+    let h = `<div class="sub-errs"><div class="small" style="font-weight:700;color:#b4232f">✏️ الأخطاء والتصويب</div>${es.map(e => `<div class="small">${errLine(e)}</div>`).join('')}`;
+    if (rng && es.some(e => e.word && e.s)) { const box = segAyahBoxes(rng, es.filter(e => e.word && e.s)); if (box) h += box.split('class="ayah-box"').join('class="ayah-box" style="font-size:20px;max-height:180px;margin-top:4px"'); }
     return h + '</div>';
   };
   const usedM = new Set(); const mp = sub => { usedM.add(sub); return PF('media') && S.settings.parentShowMedia !== false ? mediaPlayers(r.media, sub) : ''; };
@@ -113,9 +114,9 @@ function parentDay(r, subj) {
   if (mp('')) L.push(mp(''));
   if (PF('noor') && r.noor && r.noor.lesson) L.push(`🔤 <b>النورانية:</b> ${noorSegs(r.noor).map(g => { const N = NOORANIA[g.lesson - 1]; return esc(N.title) + (g.from ? ` <span class="muted">(من «${esc(N.items[g.from - 1] || '')}» إلى «${esc(N.items[g.to - 1] || '')}»)</span>` : ''); }).join('<br>')} ${gc(r.noor.grade)}${errsOf('noor')}${mp('noor')}`);
   if (PF('noor') && r.noorRev) L.push(`🔁 <b>مراجعة النورانية:</b> ${esc(noorRevText(r.noorRev))} ${gc(r.noorRev.grade)}`);
-  if (PF('cur')) Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (!c || !x || !x.lesson) return; const Ls = c.lessons[x.lesson - 1] || { items: [] }; L.push(`${c.icon} <b>${esc(c.name)}:</b> ${curSegs(x).map(g => esc((c.lessons[g.lesson - 1] || {}).t || '')).join(' + ')} ${gc(x.grade)}${(x.items || []).length ? `<div class="small" style="color:#2c7a28">✔️ أتقن: ${x.items.map(i => esc(Ls.items[i])).join('، ')}</div>` : ''}${(x.errs || []).length && PF('errors') ? `<div class="sub-errs"><div class="small">❌ يحتاج تدريباً: ${x.errs.map(i => esc(Ls.items[i])).join('، ')}</div></div>` : ''}${mp(cid)}`); });
+  if (PF('cur')) Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (!c || !x || !x.lesson) return; const Ls = c.lessons[x.lesson - 1] || { items: [] }; L.push(`${c.icon} <b>${esc(c.name)}:</b> ${curSegs(x).map(g => esc((c.lessons[g.lesson - 1] || {}).t || '')).join(' + ')} ${gc(x.grade)}${(x.items || []).length ? `<div class="small" style="color:#2c7a28">✔️ أتقن: ${x.items.map(i => esc(Ls.items[i])).join('، ')}</div>` : ''}${errsOf(cid)}${mp(cid)}`); });
   if (PF('cur')) Object.keys(r.curRev || {}).forEach(cid => { const c = curById(cid); if (c) L.push(`🔁 <b>مراجعة ${esc(c.name)}:</b> ${esc(curRevText(cid, r.curRev[cid]))} ${gc(r.curRev[cid].grade)}`); });
-  if (PF('zad')) (r.zad || []).forEach((z, i, arr) => { const c = zadCurriculum().find(c => c.id === z.cat) || {}; L.push(`${c.icon || '🌸'} <b>${esc(c.name || '')}:</b> ${esc(z.item)} ${gc(z.grade)}${i === arr.length - 1 ? errsOf('zad') + mp('zad') : ''}`); });
+  if (PF('zad')) (r.zad || []).forEach((z, i, arr) => { const c = zadCurriculum().find(c => c.id === z.cat) || {}; L.push(`${c.icon || '🌸'} <b>${esc(c.name || '')}:</b> ${esc(z.item)} ${gc(z.grade)}${errsOf('zad', null, e => e.word === z.item || (i === arr.length - 1 && !arr.some(q => q.item === e.word)))}${i === arr.length - 1 ? mp('zad') : ''}`); });
   if (PF('zad') && r.zadRev) L.push(`🔁 <b>مراجعة زاد الطفل:</b> ${esc(zadRevText(r.zadRev))} ${gc(r.zadRev.grade)}`);
   if (PF('behavior') && r.behavior) L.push('⭐ <b>السلوك:</b> ' + stars(r.behavior));
   const restM = (r.media || []).filter(x => x.share && !usedM.has(x.sub || '')); if (restM.length && PF('media') && S.settings.parentShowMedia !== false) L.push(mediaPlayers(restM));

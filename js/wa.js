@@ -23,16 +23,18 @@ function waBuild(kind, s, ctx, o) {
     const r = getRec(s.id, ctx.date) || {}; const g = x => o.grade && x && x.grade ? ' — ' + gradeLabel(x.grade) : '';
     L.push(HELLO(s)); L.push(`📅 تقرير يوم ${fmtDate(ctx.date)}`);
     if (o.att && r.att) L.push('✅ الحضور: ' + (ATT[r.att] || [''])[0]);
-    if (o.hifz && hasSeg(r.hifz)) L.push('📖 الحفظ: ' + segText(r.hifz) + g(r.hifz));
-    if (o.review && hasSeg(r.review)) L.push('🔁 المراجعة: ' + segText(r.review) + g(r.review));
-    if (o.far && hasSeg(r.far)) L.push('🕰️ المراجعة البعيدة: ' + segText(r.far) + g(r.far));
-    if (o.noor && r.noor && r.noor.lesson) L.push('🔤 النورانية: ' + noorText(r.noor, true) + g(r.noor));
+    const ER = recErrs(r); const plain = t => String(t).replace(/<[^>]+>/g, '').replace(/&laquo;|&raquo;/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+    const E = (sub, pred) => { if (!o.errors) return; ER.filter(e => e.sub === sub && (!pred || pred(e))).forEach(e => L.push('    ' + (e.fixed ? '✅ ' : '✏️ ') + plain(errPlace(e)).trim() + (e.type ? ' — ' + e.type : '') + (e.note ? ': ' + e.note : '') + (e.fixed ? ' (صُوِّب)' : ''))); };
+    if (o.hifz && hasSeg(r.hifz)) { L.push('📖 الحفظ: ' + segText(r.hifz) + g(r.hifz)); E('hifz'); }
+    if (o.review && hasSeg(r.review)) { L.push('🔁 المراجعة: ' + segText(r.review) + g(r.review)); E('review'); }
+    if (o.far && hasSeg(r.far)) { L.push('🕰️ المراجعة البعيدة: ' + segText(r.far) + g(r.far)); E('far'); }
+    if (o.noor && r.noor && r.noor.lesson) { L.push('🔤 النورانية: ' + noorText(r.noor, true) + g(r.noor)); E('noor'); }
     if (o.noor && r.noorRev) L.push('🔁 مراجعة النورانية: ' + noorRevText(r.noorRev) + g(r.noorRev));
-    if (o.zad && r.zadRev) L.push('🔁 مراجعة زاد الطفل: ' + zadRevText(r.zadRev) + g(r.zadRev));
+    if (o.cur) Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (c && x && x.lesson) { L.push(c.icon + ' ' + c.name + ': ' + curSegs(x).map(q => (c.lessons[q.lesson - 1] || {}).t || '').join(' + ') + g(x)); E(cid); } });
     if (o.cur) Object.keys(r.curRev || {}).forEach(cid => { const c = curById(cid); if (c) L.push('🔁 مراجعة ' + c.name + ': ' + curRevText(cid, r.curRev[cid]) + g(r.curRev[cid])); });
-    if (o.zad) (r.zad || []).forEach(z => { const c = zadCurriculum().find(c => c.id === z.cat); L.push('🌸 ' + (c ? c.name : '') + ': ' + z.item + g(z)); });
-    if (o.cur) Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (c && x && x.lesson) L.push(c.icon + ' ' + c.name + ': ' + c.lessons[x.lesson - 1].t + g(x)); });
-    if (o.errors) { const e = (r.errors || []); if (e.length) L.push(`✏️ الأخطاء: ${e.length}${e.filter(x => x.fixed).length ? ' (صُوّب منها ' + e.filter(x => x.fixed).length + ')' : ''}` + (e.filter(x => !x.fixed && x.word).length ? ' — يحتاج مراجعة: ' + e.filter(x => !x.fixed && x.word).map(x => x.word).slice(0, 5).join('، ') : '')); }
+    if (o.zad) { const zz = r.zad || []; zz.forEach((z, i) => { const c = zadCurriculum().find(c => c.id === z.cat); L.push('🌸 ' + (c ? c.name : '') + ': ' + z.item + g(z)); E('zad', e => e.word === z.item || (i === zz.length - 1 && !zz.some(q => q.item === e.word))); }); }
+    if (o.zad && r.zadRev) L.push('🔁 مراجعة زاد الطفل: ' + zadRevText(r.zadRev) + g(r.zadRev));
+    if (o.errors && ER.length) { const fx = ER.filter(x => x.fixed).length; L.push(`✏️ مجموع الأخطاء: ${ER.length}${fx ? ' (صُوّب منها ' + fx + ')' : ''}`); }
     if (o.behavior && r.behavior) L.push('⭐ السلوك: ' + '★'.repeat(r.behavior) + '☆'.repeat(5 - r.behavior));
     if (o.note && r.note) L.push('📝 ملاحظة المعلم: ' + r.note);
     if (o.media) (r.media || []).filter(x => x.share).forEach(x => L.push((x.type === 'video' ? '🎥 ' : '🎙️ ') + (x.label || 'تسجيل') + ':\n' + x.url));

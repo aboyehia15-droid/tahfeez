@@ -56,7 +56,7 @@ function statsOf(sid, from, to) {
     if (r.noor && r.noor.lesson) { o.noor++; o.noorItems += noorSegs(r.noor).reduce((a, g) => a + Math.abs((g.to || 0) - (g.from || 0)) + 1, 0) - (Math.abs((r.noor.to || 0) - (r.noor.from || 0)) + 1); if (r.noor.grade) { o.gsum += r.noor.grade; o.gcnt++; } }
     (r.zad || []).forEach(z => { if (z.item) { o.zad++; if (z.grade) { o.gsum += z.grade; o.gcnt++; } } });
     if (r.behavior) { o.beh += r.behavior; o.behN++; }
-    (r.errors || []).forEach(e => { o.errors++; if (e.fixed) o.fixed++; });
+    recErrs(r).forEach(e => { o.errors++; if (e.fixed) o.fixed++; });
   });
   o.reviewAll = o.review + o.far;
   const exr = T('results').filter(r => r.studentId === sid && (!from || r.date >= from) && (!to || r.date <= to)).map(r => { const ex = byId('exams', r.examId); return ex ? resTotals(ex, r).pct : null; }).filter(x => x != null);

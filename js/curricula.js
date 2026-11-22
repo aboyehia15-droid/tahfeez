@@ -12,7 +12,7 @@ function curProgress(sid, cid, recs) {
     (x.extra || []).filter(e => e.lesson).forEach(e => { map[e.lesson] = map[e.lesson] || new Set(); if (x.grade !== 1) (e.items || []).forEach(i => map[e.lesson].add(i)); });
     map[x.lesson] = map[x.lesson] || new Set();
     if (x.grade !== 1) (x.items || []).forEach(i => map[x.lesson].add(i));
-    (x.errs || []).forEach(i => { errs[x.lesson + ':' + i] = 1; });
+    (x.errs || []).forEach(i => { const fx = (r.errors || []).some(e => e.sub === cid && e.lesson == x.lesson && e.item === i && e.fixed); if (fx) delete errs[x.lesson + ':' + i]; else errs[x.lesson + ':' + i] = 1; });
     (x.items || []).forEach(i => { if (x.grade !== 1 && !(x.errs || []).includes(i)) delete errs[x.lesson + ':' + i]; });
     last = Object.assign({ date: r.date }, x);
   });
@@ -49,6 +49,7 @@ function curEditorHTML(cid, x, sid, date) {
       ${EL ? `<div class="noor-items" style="margin-top:6px">${EL.items.map((it, j) => `<button type="button" data-cxi="${cid}|${i}|${j}" class="${(e.items || []).includes(j) ? 'in' : ''}" style="font-family:Tajawal;font-size:13px">${(e.items || []).includes(j) ? '✔️ ' : ''}${esc(it)}</button>`).join('')}</div>` : ''}</div>`; }).join('')}
     <div style="margin-top:6px"><button type="button" class="btn sm light" data-cxadd="${cid}">➕ إضافة درس آخر</button></div>
     <div style="margin-top:8px">${gradeButtons(x.grade, 'cur|' + cid)}</div>
+    <div class="sub-errbox" data-eb="${cid}"></div>
     <div class="seg-box" style="background:#f6f9ff;border-color:#c9d6f0"><div class="small"><b>🔁 مراجعة دروس ${esc(c.name)}</b> <span class="muted">— اختر الدروس التي راجعها</span></div><div data-mrev="${cid}" style="margin-top:4px"></div><div style="margin-top:6px">${gradeButtons(((typeof DAILY_REV !== 'undefined' && DAILY_REV && DAILY_REV[cid]) || {}).grade, 'crev|' + cid)}</div></div>${typeof DAILY_MEDIA !== 'undefined' && DAILY_MEDIA ? `<div data-mlist="${cid}">${mediaListHTML(DAILY_MEDIA, true, cid)}</div>` : ''}</div>`;
 }
 function curSuggest(sid, date, cid) {
@@ -142,3 +143,30 @@ const noorSegs = n => n && n.lesson ? [n].concat((n.extra || []).filter(e => e.l
 function noorText(n, long) { return noorSegs(n).map(g => (long ? NOORANIA[g.lesson - 1].title : 'د' + g.lesson) + (g.from ? ' (' + g.from + '–' + g.to + ')' : '')).join(' + '); }
 function noorRevText(rv) { return rv && (rv.lessons || []).length ? rv.lessons.map(n => 'الدرس ' + n).join('، ') : ''; }
 function zadRevText(rv) { return rv && (rv.items || []).length ? rv.items.map(k => k.split('|').slice(1).join('|')).join('، ') : ''; }
+
+/* ——— الأخطاء والتصويب: كل خطأ مرتبط بمادته ——— */
+/* يجمع أخطاء التسجيل ومعها أخطاء المناهج المحددة بالضغط على البنود (للسجلات القديمة أيضاً) */
+function recErrs(r) {
+  const out = (r.errors || []).slice();
+  Object.keys(r.cur || {}).forEach(cid => {
+    const x = r.cur[cid], c = curById(cid); if (!c || !x || !x.lesson) return;
+    const L = c.lessons[x.lesson - 1] || { items: [] };
+    (x.errs || []).forEach(i => { if (!out.some(e => e.sub === cid && e.lesson == x.lesson && e.item === i)) out.push({ sub: cid, lesson: x.lesson, item: i, word: L.items[i], type: 'يحتاج تدريباً', note: '' }); });
+  });
+  return out;
+}
+function errSubName(sub) {
+  const M = { hifz: 'الحفظ', review: 'المراجعة', far: 'المراجعة البعيدة', noor: 'النورانية', zad: 'زاد الطفل' };
+  return M[sub] || (curById(sub) ? curById(sub).name : '');
+}
+/* موضع الخطأ داخل مادته (بدون اسم المادة) */
+function errPlace(e) {
+  if (['hifz', 'review', 'far'].includes(e.sub)) return (e.s ? (Q.names[e.s - 1] || '') + ' ' + (e.a || '') : '') + (e.word ? ' «' + esc(e.word) + '»' : '');
+  if (e.sub === 'noor') return (e.lesson ? 'د' + e.lesson + ' ' : '') + (e.word ? '«' + esc(e.word) + '»' : '');
+  if (curById(e.sub)) { const c = curById(e.sub); return (e.lesson ? esc(curShort((c.lessons[e.lesson - 1] || {}).t || '')) : '') + (e.word ? ' — «' + esc(e.word) + '»' : ''); }
+  return e.word ? '«' + esc(e.word) + '»' : '';
+}
+function errLine(e, withSub) {
+  const p = errPlace(e).trim();
+  return `${e.fixed ? '✅' : '❌'} ${withSub ? '<b>' + esc(errSubName(e.sub)) + ':</b> ' : ''}${p}${p && (e.type || e.note) ? ' — ' : ''}${esc(e.type || '')}${e.note ? ': ' + esc(e.note) : ''}${e.fixed ? ' <span class="muted">(صُوِّب)</span>' : ''}`;
+}

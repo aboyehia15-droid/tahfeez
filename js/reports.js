@@ -89,12 +89,12 @@ function studentReport(s, from, to, periodLbl, subs) {
   }
   if (subs.noor && f.noor) {
     const nr = rs.filter(r => (r.noor && r.noor.lesson) || r.noorRev);
-    h += `<div class="rep-sec">🔤 القاعدة النورانية</div>` + (nr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>الدرس</th><th>من بند</th><th>إلى بند</th><th>التقدير</th><th>أخطاء</th><th>مراجعة الدروس</th></tr>${nr.map(r => !r.noor ? `<tr><td>${fmtDate(r.date)}</td><td colspan="5"></td><td class="r small">${esc(noorRevText(r.noorRev))} ${gradeLabel(r.noorRev.grade)}</td></tr>` : `<tr><td>${fmtDate(r.date)}</td><td class="r">${noorSegs(r.noor).map(g => esc(NOORANIA[g.lesson - 1].title)).join('<br>')}</td><td>${r.noor.from || ''}${r.noor.from ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.from - 1] || '') + '»' : ''}</td><td>${r.noor.to || ''}${r.noor.to ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.to - 1] || '') + '»' : ''}</td><td>${gradeLabel(r.noor.grade)}</td><td>${(r.errors || []).filter(e => e.sub === 'noor').map(e => esc(e.word || '')).join('، ')}</td><td class="r small">${r.noorRev ? esc(noorRevText(r.noorRev)) + ' ' + gradeLabel(r.noorRev.grade) : ''}</td></tr>`).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
+    h += `<div class="rep-sec">🔤 القاعدة النورانية</div>` + (nr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>الدرس</th><th>من بند</th><th>إلى بند</th><th>التقدير</th><th>أخطاء</th><th>مراجعة الدروس</th></tr>${nr.map(r => !r.noor ? `<tr><td>${fmtDate(r.date)}</td><td colspan="5"></td><td class="r small">${esc(noorRevText(r.noorRev))} ${gradeLabel(r.noorRev.grade)}</td></tr>` : `<tr><td>${fmtDate(r.date)}</td><td class="r">${noorSegs(r.noor).map(g => esc(NOORANIA[g.lesson - 1].title)).join('<br>')}</td><td>${r.noor.from || ''}${r.noor.from ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.from - 1] || '') + '»' : ''}</td><td>${r.noor.to || ''}${r.noor.to ? ' «' + esc(NOORANIA[r.noor.lesson - 1].items[r.noor.to - 1] || '') + '»' : ''}</td><td>${gradeLabel(r.noor.grade)}</td><td class="r small">${(r.errors || []).filter(e => e.sub === 'noor').map(e => errLine(e)).join('<br>')}</td><td class="r small">${r.noorRev ? esc(noorRevText(r.noorRev)) + ' ' + gradeLabel(r.noorRev.grade) : ''}</td></tr>`).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
   }
   classSubjects(c).filter(isCur).filter(cid => subs['c_' + cid] !== 0).forEach(cid => { h += curStudentSection(s, cid, rs); });
   if (subs.zad && f.zad) {
-    const zr = []; rs.forEach(r => (r.zad || []).forEach(z => zr.push(Object.assign({ date: r.date }, z))));
-    h += `<div class="rep-sec">🌸 زاد الطفل المسلم</div>` + (zr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المجال</th><th>البند</th><th>التقدير</th></tr>${zr.map(z => { const cat = zadCurriculum().find(c => c.id === z.cat) || {}; return `<tr><td>${fmtDate(z.date)}</td><td>${cat.icon || ''} ${esc(cat.name || '')}</td><td class="r">${esc(z.item)}</td><td>${gradeLabel(z.grade)}</td></tr>`; }).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
+    const zr = []; rs.forEach(r => (r.zad || []).forEach((z, zi, za) => zr.push(Object.assign({ date: r.date, errs: (r.errors || []).filter(e => e.sub === 'zad' && (e.word === z.item || (!za.some(q => q.item === e.word) && zi === za.length - 1))) }, z))));
+    h += `<div class="rep-sec">🌸 زاد الطفل المسلم</div>` + (zr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المجال</th><th>البند</th><th>التقدير</th><th>الأخطاء والتصويب</th></tr>${zr.map(z => { const cat = zadCurriculum().find(c => c.id === z.cat) || {}; return `<tr><td>${fmtDate(z.date)}</td><td>${cat.icon || ''} ${esc(cat.name || '')}</td><td class="r">${esc(z.item)}</td><td>${gradeLabel(z.grade)}</td><td class="r small">${(z.errs || []).map(e => errLine(e)).join('<br>')}</td></tr>`; }).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
   }
   if (subs.exams !== 0) h += studentExamsSection(s, from, to);
   if (subs.att) { const ab = rs.filter(r => r.att === 'a' || r.att === 'e' || r.att === 'l'); h += `<div class="rep-sec">📅 الحضور والغياب</div><div class="small">حاضر: <b>${o.p}</b> — متأخر: <b>${o.l}</b> — مستأذن: <b>${o.e}</b> — غائب: <b style="color:var(--red)">${o.a}</b> — نسبة الحضور: <b>${o.attPct}%</b></div>${ab.length ? `<div class="small" style="margin-top:4px">${ab.map(r => `<span class="chip ${r.att === 'a' ? 'red' : r.att === 'l' ? 'gold' : 'blue'}">${ATT[r.att][0]}: ${fmtDate(r.date)}</span>`).join(' ')}</div>` : ''}`; }
@@ -106,10 +106,7 @@ function studentReport(s, from, to, periodLbl, subs) {
   h += `<div class="rep-foot"><span>معلم الفصل: ${esc(t ? t.name : '')}</span><span>المشرف: ${esc(S.settings.supervisor || '')}</span><span>تاريخ الطباعة: ${fmtDate(todayISO(), false)}</span></div>`;
   return h;
 }
-function errText(e) {
-  const where = e.sub === 'noor' ? 'نورانية د' + e.lesson + (e.word ? ' «' + esc(e.word) + '»' : '') : e.sub === 'zad' ? 'زاد الطفل' : (e.sub === 'review' ? 'مراجعة: ' : e.sub === 'far' ? 'مراجعة بعيدة: ' : 'حفظ: ') + (Q.names[e.s - 1] || '') + ' ' + (e.a || '') + (e.word ? ' «' + esc(e.word) + '»' : '');
-  return `${e.fixed ? '✅' : '❌'} ${where} — ${esc(e.type || '')}${e.note ? ': ' + esc(e.note) : ''}`;
-}
+function errText(e) { return errLine(e, true); }
 function weekReport(cid, ws, blank) {
   const c = byId('classes', cid); if (!c) return '<div class="empty">اختر فصلاً</div>';
   const t = teacherOf(c); const subj = classSubjects(c);
@@ -183,7 +180,7 @@ function zadReport(cid, from, to, lbl) {
 function errorsReport(cid, from, to, lbl) {
   const c = byId('classes', cid); if (!c) return ''; const st = studentsOfClass(cid);
   let h = repHeader('تقرير الأخطاء والتصويب', lbl) + `<div class="rep-meta"><span>الفصل: <b>${esc(c.name)}</b></span></div>`;
-  const rows = []; st.forEach(s => recsOf(s.id, from, to).forEach(r => (r.errors || []).forEach(e => rows.push({ s, r, e }))));
+  const rows = []; st.forEach(s => recsOf(s.id, from, to).forEach(r => recErrs(r).forEach(e => rows.push({ s, r, e }))));
   const fixed = rows.filter(x => x.e.fixed).length;
   h += kpis([[rows.length, 'إجمالي الأخطاء'], [fixed, '✅ تم تصويبها'], [rows.length - fixed, '❌ تحتاج متابعة'], [rows.length ? Math.round(fixed / rows.length * 100) + '%' : '—', 'نسبة التصويب']]);
   const types = {}; rows.forEach(x => types[x.e.type] = (types[x.e.type] || 0) + 1);
