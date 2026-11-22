@@ -61,7 +61,8 @@ function viewReports(v, sub, arg) {
     fees: () => `<div class="report">${feesReport(REP.cls)}</div>`
   };
   out.innerHTML = classes.length || REP.type === 'fees' || REP.type === 'all' ? R[REP.type]() : '<div class="card empty">لا توجد فصول بعد</div>';
-  $('#rprint').onclick = () => { if (REP.type === 'week') { const st = document.createElement('style'); st.id = 'landscape'; st.textContent = '@page{size:A4 landscape;margin:8mm}'; document.head.appendChild(st); setTimeout(() => st.remove(), 3000); } window.print(); };
+  mobileTables(out);
+  $('#rprint').onclick = () => printLandscape();
   $('#rxls').onclick = () => exportTables(out, REP.type === 'cur' ? 'تقرير ' + ((curById(REP.cur) || {}).name || 'منهج') : REPORTS.find(r => r[0] === REP.type)[1].replace(/^\S+\s/, ''));
   const rw = $('#rwa'); if (rw) rw.onclick = () => { if (REP.type === 'exam' || REP.type === 'examclass') { const ex = byId('exams', REP.exam); if (!ex) return; const list = (REP.type === 'examclass' || REP.allStu ? studs : studs.filter(s => s.id === REP.stu)).filter(s => getRes(ex.id, s.id)); return waCompose('exam', list, { ex }); } const list = REP.allStu ? studs : [byId('students', REP.stu)]; waCompose('period', list, { from, to, label: periodLbl }); };
 }
@@ -83,7 +84,7 @@ function studentReport(s, from, to, periodLbl, subs) {
   if (subs.quran && f.quran) {
     const qr = rs.filter(r => (hasSeg(r.hifz)) || (hasSeg(r.review)) || (hasSeg(r.far)) || r.att === 'a');
     h += `<div class="rep-sec">📖 القرآن الكريم — الحفظ والمراجعة</div>`;
-    h += qr.length ? `<table class="tbl"><tr><th>اليوم</th><th>التاريخ</th><th>الحضور</th><th>الحفظ (السورة والآيات)</th><th>أوجه</th><th>التقدير</th><th>المراجعة القريبة</th><th>أوجه</th><th>التقدير</th><th>المراجعة البعيدة</th><th>أوجه</th><th>التقدير</th><th>الأخطاء والتصويب</th></tr>${qr.map(r => `<tr><td>${dayName(r.date)}</td><td>${fmtDate(r.date, false)}</td>${r.att === 'a' ? '<td colspan="11" style="color:var(--red);font-weight:700">غائب</td>' : `<td>${ATT[r.att] ? ATT[r.att][0] : ''}</td>${['hifz', 'review', 'far'].map(k => `<td class="r">${r[k] ? segText(r[k]) : '—'}</td><td>${r[k] ? num(r[k].pages) : ''}</td><td>${r[k] ? gradeLabel(r[k].grade) : ''}</td>`).join('')}<td class="r small">${(r.errors || []).filter(e => ['hifz', 'review', 'far'].includes(e.sub)).map(e => errText(e)).join('<br>')}</td>`}</tr>`).join('')}<tr style="font-weight:800"><td colspan="4">الإجمالي</td><td>${num(o.hifz)}</td><td></td><td></td><td>${num(o.review)}</td><td></td><td></td><td>${num(o.far)}</td><td></td><td></td></tr></table>` : '<div class="muted small">لا توجد تسجيلات في هذه الفترة</div>';
+    h += qr.length ? `<table class="tbl"><tr><th>اليوم</th><th>التاريخ</th><th>الحضور</th><th>الحفظ (السورة)</th><th>أوجه</th><th>التقدير</th><th>المراجعة القريبة</th><th>أوجه</th><th>التقدير</th><th>المراجعة البعيدة</th><th>أوجه</th><th>التقدير</th><th>الأخطاء والتصويب</th></tr>${qr.map(r => `<tr><td>${dayName(r.date)}</td><td>${fmtDate(r.date, false)}</td>${r.att === 'a' ? '<td colspan="11" style="color:var(--red);font-weight:700">غائب</td>' : `<td>${ATT[r.att] ? ATT[r.att][0] : ''}</td>${['hifz', 'review', 'far'].map(k => `<td class="r">${hasSeg(r[k]) ? '<b>' + esc(qSurahs(r[k])) + '</b>' : '—'}</td><td>${hasSeg(r[k]) ? qPagesOf(r[k]) : ''}</td><td>${r[k] ? gradeLabel(r[k].grade) : ''}</td>`).join('')}<td class="r small">${(r.errors || []).filter(e => ['hifz', 'review', 'far'].includes(e.sub)).map(e => errText(e)).join('<br>')}</td>`}</tr>`).join('')}<tr style="font-weight:800"><td colspan="4">الإجمالي</td><td>${num(o.hifz)}</td><td></td><td></td><td>${num(o.review)}</td><td></td><td></td><td>${num(o.far)}</td><td></td><td></td></tr></table>` : '<div class="muted small">لا توجد تسجيلات في هذه الفترة</div>';
     const memo = memorizedSet(allRecsOf(s.id)); const prog = surahProgress(memo); const done = prog.map((p, i) => [p, i]).filter(x => x[0] > 0);
     if (done.length) h += `<div class="small" style="margin-top:6px"><b>السور المحفوظة حتى الآن (${num(pagesOfSet(memo))} وجه):</b> ${done.map(([p, i]) => Q.names[i] + (p < 1 ? ' (' + Math.round(p * 100) + '%)' : ' ✓')).join('، ')}</div>`;
   }
@@ -107,32 +108,52 @@ function studentReport(s, from, to, periodLbl, subs) {
   return h;
 }
 function errText(e) { return errLine(e, true); }
+/* القرآن في الكشوف: اسم السورة وعدد الأوجه */
+function qSurahs(x) { return segs(x).map(g => { const a = Q.names[g.s1 - 1], z = Q.names[(g.s2 || g.s1) - 1]; return a === z ? a : a + ' ← ' + z; }).join('، '); }
+function qPagesOf(x) { const p = x.pages != null && !(x.extra || []).length ? x.pages : segPages(x); return num(Math.round(p * 100) / 100); }
 function weekReport(cid, ws, blank) {
   const c = byId('classes', cid); if (!c) return '<div class="empty">اختر فصلاً</div>';
   const t = teacherOf(c); const subj = classSubjects(c);
   const days = []; for (let i = 0; i < 7; i++) { const d = addDays(ws, i); if ((S.settings.workDays || [0, 1, 2, 3, 4]).includes(parseISO(d).getDay())) days.push(d); }
   const studs = studentsOfClass(cid);
-  const cell = r => {
-    if (blank) return '<div style="height:44px"></div>';
-    if (!r) return '';
-    if (r.att === 'a') return 'غائب'; if (r.att === 'e') return 'مستأذن';
-    const L = [];
-    if (hasSeg(r.hifz)) L.push(`<b>ح:</b> ${segText(r.hifz)} <small>(${gradeLabel(r.hifz.grade)})</small>`);
-    if (hasSeg(r.review)) L.push(`<b>م:</b> ${segText(r.review)} <small>(${gradeLabel(r.review.grade)})</small>`);
-    if (hasSeg(r.far)) L.push(`<b>ب:</b> ${segText(r.far)} <small>(${gradeLabel(r.far.grade)})</small>`);
-    Object.keys(r.cur || {}).forEach(cid => { const c = curById(cid); const x = r.cur[cid]; if (c && x && x.lesson) L.push(`${c.icon} ${esc(curShort(c.lessons[x.lesson - 1].t))} <small>(${gradeLabel(x.grade)})</small>`); });
-    if (r.noor && r.noor.lesson) L.push(`<b>ن:</b> ${noorText(r.noor)} <small>(${gradeLabel(r.noor.grade)})</small>`);
-    if (r.noorRev) L.push(`<b>مر ن:</b> ${(r.noorRev.lessons || []).map(n => 'د' + n).join('، ')}`);
-    Object.keys(r.curRev || {}).forEach(cid => { const c = curById(cid); if (c) L.push(`<b>مر ${c.icon}:</b> ${esc(curRevText(cid, r.curRev[cid]))}`); });
-    if (r.zad && r.zad.length) L.push(`<b>ز:</b> ${r.zad.map(z => esc(z.item)).join('، ')}`);
-    if (r.att === 'l') L.push('<small>متأخر</small>');
-    return L.join('<br>');
-  };
+  const recs = {}; studs.forEach(st => days.forEach(d => { recs[st.id + d] = getRec(st.id, d); }));
+  const anyRec = f => studs.some(st => days.some(d => { const r = recs[st.id + d]; return r && f(r); }));
+  const g = v => v ? `<span class="wk-g">${gradeLabel(v)}</span>` : '';
+  const q = k => r => hasSeg(r[k]) ? `<b>${esc(qSurahs(r[k]))}</b><span class="wk-p">${qPagesOf(r[k])} وجه</span>${g(r[k].grade)}` : '';
+  // صفوف المواد حسب مواد الفصل
+  const rows = [];
+  if (subj.includes('quran')) {
+    rows.push(['📖 الحفظ', q('hifz')], ['🔁 المراجعة', q('review')]);
+    if (blank || anyRec(r => hasSeg(r.far))) rows.push(['🕰️ مراجعة بعيدة', q('far')]);
+  }
+  if (subj.includes('noor')) rows.push(['🔤 النورانية', r => [r.noor && r.noor.lesson ? `<b>${noorSegs(r.noor).map(x => 'د' + x.lesson).join(' + ')}</b>${r.noor.from ? `<span class="wk-p">${r.noor.from}–${r.noor.to || r.noor.from}</span>` : ''}${g(r.noor.grade)}` : '', r.noorRev ? `<span class="wk-rev">مراجعة: ${(r.noorRev.lessons || []).map(n => 'د' + n).join('، ')}</span>` : ''].join('')]);
+  subj.filter(isCur).forEach(k => { const cu = curById(k); if (!cu) return; rows.push([cu.icon + ' ' + cu.name, r => { const x = (r.cur || {})[k]; return [x && x.lesson ? `<b>${curSegs(x).map(z => esc(curShort((cu.lessons[z.lesson - 1] || {}).t || ''))).join(' + ')}</b>${g(x.grade)}` : '', (r.curRev || {})[k] ? `<span class="wk-rev">مراجعة: ${esc(curRevText(k, r.curRev[k]))}</span>` : ''].join(''); }]); });
+  if (subj.includes('zad')) rows.push(['🌸 زاد الطفل', r => [(r.zad || []).map(z => esc(z.item) + (z.grade ? ' ' + g(z.grade) : '')).join('<br>'), r.zadRev ? `<span class="wk-rev">مراجعة: ${esc(zadRevText(r.zadRev))}</span>` : ''].join('')]);
+  if (!rows.length) rows.push(['المتابعة', () => '']);
   let h = repHeader('كشف متابعة الحلقة — جدول الأسبوع', 'الأسبوع من ' + fmtDate(days[0] || ws) + ' إلى ' + fmtDate(days[days.length - 1] || ws) + ' — ' + hijri(days[0] || ws));
-  h += `<div class="rep-meta"><span>الفصل: <b>${esc(c.name)}</b></span><span>المعلم: <b>${esc(t ? t.name : '')}</b></span>${S.settings.supervisor ? `<span>المشرف: <b>${esc(S.settings.supervisor)}</b></span>` : ''}<span>عدد الطلاب: <b>${studs.length}</b></span><span class="small muted">ح: حفظ — م: مراجعة قريبة — ب: مراجعة بعيدة${subj.includes('noor') ? ' — ن: نورانية' : ''}${subj.includes('zad') ? ' — ز: زاد الطفل' : ''}</span></div>`;
-  h += `<div class="tbl-wrap"><table class="tbl week-tbl"><tr><th>م</th><th>اسم الطالب</th>${days.map(d => `<th>${dayName(d)}<br><small>${fmtDate(d, false)}</small></th>`).join('')}${blank ? '' : '<th>أوجه الحفظ</th><th>أوجه المراجعة</th><th>الغياب</th>'}</tr>`;
-  studs.forEach((s, i) => { const o = statsOf(s.id, days[0], days[days.length - 1]); h += `<tr><td>${i + 1}</td><td class="r" style="white-space:nowrap"><b>${esc(s.name)}</b></td>${days.map(d => { const r = getRec(s.id, d); return `<td class="r ${r && r.att === 'a' && !blank ? 'abs' : ''}">${cell(r)}</td>`; }).join('')}${blank ? '' : `<td><b>${num(o.hifz)}</b></td><td><b>${num(o.reviewAll)}</b></td><td>${o.a || ''}</td>`}</tr>`; });
-  h += `</table></div><div class="rep-foot"><span>توقيع المعلم: ..................</span><span>توقيع المشرف: ..................</span></div>`;
+  h += `<div class="rep-meta"><span>الفصل: <b>${esc(c.name)}</b></span><span>المعلم: <b>${esc(t ? t.name : '')}</b></span>${S.settings.supervisor ? `<span>المشرف: <b>${esc(S.settings.supervisor)}</b></span>` : ''}<span>عدد الطلاب: <b>${studs.length}</b></span></div>`;
+  h += `<div class="tbl-wrap wk-wrap"><table class="tbl week-tbl no-stack"><thead><tr><th class="wk-n">م</th><th class="wk-name">اسم الطالب</th><th class="wk-sub">المادة</th>${days.map(d => `<th>${dayName(d)}<br><small>${fmtDate(d, false)}</small></th>`).join('')}${blank ? '' : '<th class="wk-tot">أوجه الحفظ</th><th class="wk-tot">أوجه المراجعة</th><th class="wk-tot">الغياب</th>'}</tr></thead><tbody>`;
+  studs.forEach((st, i) => {
+    const o = blank ? null : statsOf(st.id, days[0], days[days.length - 1]);
+    // في الكشف المعبّأ تظهر المواد التي درسها الطالب هذا الأسبوع فقط (الكشف الفارغ يظهر كل المواد)
+    let mine = blank ? rows : rows.filter(([, fn]) => days.some(d => { const r = recs[st.id + d]; return r && r.att !== 'a' && r.att !== 'e' && fn(r); }));
+    if (!mine.length) mine = [['—', () => '']];
+    const n = mine.length;
+    mine.forEach(([lbl, fn], j) => {
+      h += `<tr class="${j === 0 ? 'wk-first' : ''} ${i % 2 ? 'wk-odd' : ''}">`;
+      if (j === 0) h += `<td rowspan="${n}" class="wk-n">${i + 1}</td><td rowspan="${n}" class="r wk-name"><b>${esc(st.name)}</b></td>`;
+      h += `<td class="r wk-sub">${lbl}</td>`;
+      days.forEach(d => {
+        const r = recs[st.id + d];
+        if (blank) { h += '<td class="wk-cell wk-blank"></td>'; return; }
+        if (r && (r.att === 'a' || r.att === 'e')) { if (j === 0) h += `<td rowspan="${n}" class="${r.att === 'a' ? 'abs' : 'exc'}">${r.att === 'a' ? 'غائب' : 'مستأذن'}</td>`; return; }
+        h += `<td class="r wk-cell">${r ? fn(r) : ''}${r && r.att === 'l' && j === 0 ? '<span class="wk-rev">متأخر</span>' : ''}</td>`;
+      });
+      if (!blank && j === 0) h += `<td rowspan="${n}" class="wk-tot"><b>${num(o.hifz)}</b></td><td rowspan="${n}" class="wk-tot"><b>${num(o.reviewAll)}</b></td><td rowspan="${n}" class="wk-tot">${o.a || 0}</td>`;
+      h += '</tr>';
+    });
+  });
+  h += `</tbody></table></div><div class="rep-foot"><span>توقيع المعلم: ..................</span><span>توقيع المشرف: ..................</span></div>`;
   return h;
 }
 function classReport(cid, from, to, lbl) {
@@ -214,4 +235,24 @@ function examReportOut(studs, perStudent) {
   if (!perStudent) return `<div class="report">${examClassSheet(ex, REP.cls, show)}</div>`;
   const list = REP.allStu ? studs : studs.filter(s => s.id === REP.stu);
   return list.map((s, i) => `<div class="report ${i < list.length - 1 ? 'page-break' : ''}" style="margin-bottom:14px">${examStudentBlock(ex, s, show)}</div>`).join('') || '<div class="card empty">لا يوجد طلاب</div>';
+}
+
+/* الطباعة أفقية دائماً (A4 بالعرض) لتتسع الخانات، وتبقى حتى ينتهي الطباعة */
+function printLandscape() {
+  let st = document.getElementById('landscape');
+  if (!st) { st = document.createElement('style'); st.id = 'landscape'; st.textContent = '@page{size:A4 landscape;margin:7mm}'; document.head.appendChild(st); }
+  const done = () => { window.removeEventListener('afterprint', done); setTimeout(() => { const x = document.getElementById('landscape'); if (x) x.remove(); }, 500); };
+  window.addEventListener('afterprint', done);
+  window.print();
+}
+/* الجوال: الجداول البسيطة تتحول إلى بطاقات مرتبة، والكشوف الكبيرة تُمرَّر أفقياً مع تثبيت اسم الطالب */
+function mobileTables(root) {
+  $$('table.tbl', root).forEach(t => {
+    if (!t.parentElement.classList.contains('tbl-wrap')) { const w = document.createElement('div'); w.className = 'tbl-wrap'; t.parentNode.insertBefore(w, t); w.appendChild(t); }
+    if (t.classList.contains('no-stack') || t.querySelector('td[rowspan]')) return;
+    const head = t.querySelector('tr'); if (!head || !head.querySelector('th')) return;
+    const labels = []; $$('th', head).forEach(th => { const n = +(th.getAttribute('colspan') || 1); for (let i = 0; i < n; i++) labels.push(th.textContent.trim()); });
+    head.classList.add('stack-head'); t.classList.add('stackable');
+    $$('tr', t).forEach(tr => { if (tr === head) return; let i = 0; $$('td', tr).forEach(td => { td.setAttribute('data-l', +(td.getAttribute('colspan') || 1) > 1 ? '' : (labels[i] || '')); i += +(td.getAttribute('colspan') || 1); }); });
+  });
 }

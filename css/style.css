@@ -201,7 +201,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:16px}
 .report .tbl{font-size:14.5px}
 .report .tbl th{background:#0f5c55}
 .rep-foot{display:flex;justify-content:space-between;margin-top:26px;font-size:15px;color:var(--muted)}
-.week-tbl td{font-size:13px;line-height:1.5}
+.week-tbl td{font-size:13px;line-height:1.45}
 .week-tbl .abs{background:#fde4e7!important;color:var(--red);font-weight:700}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:8px}
 .kpi{border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center;background:#fffdf8}
@@ -313,3 +313,59 @@ details.pexam summary::-webkit-details-marker{display:none}
 @keyframes instUp{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
 .inst-steps>div{display:flex;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line);font-size:17px}.inst-steps>div>span{flex:1;line-height:1.6}.inst-steps>div>b:first-child{flex-shrink:0;background:var(--teal);color:#fff;min-width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
 .ios-ic{display:inline-block;border:1.5px solid var(--line);border-radius:8px;padding:0 6px}
+
+/* ——— كشف المتابعة الأسبوعي: جدول واضح ——— */
+.week-tbl{border:1.5px solid #0f5c55}
+.week-tbl th,.week-tbl td{border:1px solid #c9d6d2}
+.week-tbl th{font-size:13.5px;padding:6px 4px}
+.week-tbl .wk-n{width:26px}
+.week-tbl .wk-name{min-width:120px;white-space:nowrap;background:#fbfaf5}
+.week-tbl .wk-sub{white-space:nowrap;font-size:12.5px;font-weight:700;color:var(--teal);background:#f3f8f6;width:1%}
+.week-tbl .wk-cell{min-width:92px;vertical-align:top;padding:4px 5px}
+.week-tbl .wk-cell b{display:block;font-size:13px}
+.week-tbl .wk-p{display:inline-block;font-size:12px;color:#0f5c55;font-weight:700;margin-inline-end:4px}
+.week-tbl .wk-g{display:inline-block;font-size:11px;color:#7a5b00;background:#fdf3d6;border-radius:6px;padding:0 4px}
+.week-tbl .wk-rev{display:block;font-size:11.5px;color:#3d5a80;margin-top:2px}
+.week-tbl .wk-blank{height:34px}
+.week-tbl .wk-tot{background:#fbfaf5;font-size:14px;width:56px}
+.week-tbl tr.wk-first td{border-top:2px solid #0f5c55}
+.week-tbl .exc{background:#e6f0fb!important;color:#2b5ea7;font-weight:700}
+/* ——— التقارير على الجوال ——— */
+@media (max-width:760px){
+  .report{padding:10px;border-radius:10px}
+  .rep-head img{height:44px;max-width:80px}
+  .rep-head .c h2{font-size:17px}.rep-head .c div{font-size:12.5px}
+  .rep-meta{font-size:13px;gap:4px 12px;padding:6px 8px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi .v{font-size:19px}
+  .rep-sec{font-size:15px}
+  .report .tbl{font-size:13px}
+  /* الجداول البسيطة: بطاقة لكل صف */
+  .tbl-wrap:has(> table.stackable){border:0;overflow:visible}
+  table.stackable,table.stackable tbody{display:block}
+  table.stackable tr.stack-head{display:none}
+  table.stackable tr{display:block;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fff;padding:4px 0;box-shadow:0 1px 3px #0000000d}
+  table.stackable td{display:flex;justify-content:space-between;gap:10px;text-align:left;border-bottom:1px dashed #eee;padding:6px 10px}
+  table.stackable td:last-child{border-bottom:0}
+  table.stackable td.r{text-align:left}
+  table.stackable td::before{content:attr(data-l);font-weight:700;color:var(--teal);text-align:right;flex-shrink:0;max-width:45%}
+  table.stackable td[data-l=""]{justify-content:center}table.stackable td[data-l=""]::before{display:none}
+  table.stackable td:empty{display:none}
+  /* الكشف الأسبوعي: تمرير أفقي مع تثبيت اسم الطالب والمادة */
+  .wk-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .week-tbl .wk-name{position:sticky;right:0;z-index:2;min-width:96px;font-size:12.5px;white-space:normal}
+  .week-tbl th.wk-name{z-index:3;background:#0f5c55}
+  .week-tbl .wk-n{display:none}
+  .week-tbl .wk-cell{min-width:84px}
+  .week-tbl .wk-sub{font-size:11px;white-space:normal;min-width:58px;max-width:70px;padding:3px}
+  .week-tbl .wk-name{min-width:78px;max-width:90px}
+}
+@media print{
+  .week-tbl{font-size:12px}
+  .week-tbl td,.week-tbl th{border:1px solid #9fb3ad!important}
+  .week-tbl tr{page-break-inside:avoid}
+  .tbl-wrap{overflow:visible!important;border:0}
+  table.stackable,table.stackable tbody{display:table!important}
+  table.stackable tr{display:table-row!important}table.stackable tr.stack-head{display:table-row!important}
+  table.stackable td{display:table-cell!important}table.stackable td::before{display:none!important}
+}
