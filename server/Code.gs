@@ -19,6 +19,8 @@ var TABLES = {
   records:  ['id', 'studentId', 'classId', 'date', 'updatedAt', 'json'],
   payments: ['id', 'studentId', 'date', 'amount', 'updatedAt', 'json'],
   invites:  ['id', 'phone', 'name', 'sentAt', 'updatedAt', 'json'],
+  exams:    ['id', 'title', 'kind', 'date', 'updatedAt', 'json'],
+  results:  ['id', 'examId', 'studentId', 'classId', 'date', 'updatedAt', 'json'],
   settings: ['id', 'updatedAt', 'json']
 };
 var SECRET_FIELDS = ['passHash'];
@@ -30,6 +32,14 @@ function setup() {
   if (s1 && ss.getSheets().length > 1) { try { ss.deleteSheet(s1); } catch (e) {} }
   receiptsFolder_(); // لطلب صلاحية Google Drive لحفظ إيصالات الرسوم
   return 'تم التجهيز';
+}
+
+function subFolder_(name) {
+  var props = PropertiesService.getScriptProperties(); var key = 'FOLDER_' + name;
+  var id = props.getProperty(key);
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  var f = DriveApp.createFolder({ media: 'تسجيلات التسميع والاختبارات', sheets: 'أوراق إجابات الاختبارات' }[name] || name);
+  props.setProperty(key, f.getId()); return f;
 }
 
 function receiptsFolder_() {
@@ -206,7 +216,12 @@ function route_(r) {
     var st3 = settings_();
     var pays = st3.parentShowFees === false ? [] : readAll_('payments').filter(function (p) { return p.studentId === stu.id; });
     var safe = {}; for (var k in stu) if (['idNumber', 'guardianId', 'parentToken', '_row'].indexOf(k) < 0) safe[k] = stu[k];
-    return { ok: true, student: safe, cls: cls, teacher: teacher ? { name: teacher.name, phone: teacher.phone } : null,
+    var myRes = st3.parentShowExams === false ? [] : readAll_('results').filter(function (x) { return x.studentId === stu.id && x.published !== false; });
+    var exIds = myRes.map(function (x) { return x.examId; });
+    var myExams = readAll_('exams').filter(function (e) { return exIds.indexOf(e.id) >= 0; }).map(function (e) {
+      return { id: e.id, title: e.title, kind: e.kind, date: e.date, total: e.total, subjects: (e.subjects || []).map(function (s) { return { id: s.id, book: s.book, name: s.name, icon: s.icon, total: s.total, questions: (s.questions || []).map(function (q) { return { id: q.id, mark: q.mark }; }) }; }) };
+    });
+    return { ok: true, student: safe, cls: cls, teacher: teacher ? { name: teacher.name, phone: teacher.phone } : null, results: myRes, exams: myExams,
       records: recs, payments: pays, mates: mates, mateRecords: mateRecs, settings: publicSettings_(st3) };
   }
 
@@ -221,6 +236,7 @@ function route_(r) {
       var my = data.classes.filter(function (c) { return c.teacherId === me.id || (c.teacherIds || []).indexOf(me.id) >= 0; }).map(function (c) { return c.id; });
       data.students = data.students.filter(function (s) { return my.indexOf(s.classId) >= 0; });
       data.records = data.records.filter(function (x) { return my.indexOf(x.classId) >= 0; });
+      data.results = data.results.filter(function (x) { return my.indexOf(x.classId) >= 0; });
       data.payments = []; data.invites = [];
       data.users = data.users.map(function (u) { return { id: u.id, name: u.name, role: u.role }; });
       data.settings = data.settings.map(function (x) { var c = {}; for (var k in x) if (k !== 'waToken' && k !== 'waInstance') c[k] = x[k]; return c; });
@@ -230,7 +246,7 @@ function route_(r) {
 
   if (a === 'save') {
     if (!TABLES[r.table]) return { ok: false, error: 'جدول غير معروف' };
-    if (me.role === 'teacher' && ['records', 'students'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
+    if (me.role === 'teacher' && ['records', 'students', 'results', 'exams'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
     var rows = r.rows || [];
     if (r.table === 'users') {
       if (me.role !== 'admin') return { ok: false, error: 'للمدير فقط' };
@@ -246,7 +262,7 @@ function route_(r) {
   }
 
   if (a === 'del') {
-    if (me.role === 'teacher' && r.table !== 'records') return { ok: false, error: 'لا تملك الصلاحية' };
+    if (me.role === 'teacher' && ['records', 'results', 'exams'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
     var sh = sheet_(r.table);
     var last = sh.getLastRow();
     if (last >= 2) {
@@ -256,12 +272,34 @@ function route_(r) {
     return { ok: true };
   }
 
-  if (a === 'upload') { // رفع إيصال سداد إلى Google Drive
-    if (me.role === 'teacher') return { ok: false, error: 'لا تملك الصلاحية' };
+  if (a === 'upload') { // رفع ملف (إيصال، ورقة إجابة، تسجيل صوت/فيديو) إلى Google Drive
     var blob = Utilities.newBlob(Utilities.base64Decode(r.data), r.mime || 'application/octet-stream', r.name || 'إيصال');
-    var file = receiptsFolder_().createFile(blob);
+    var file = (r.folder ? subFolder_(r.folder) : receiptsFolder_()).createFile(blob);
     try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
     return { ok: true, url: 'https://drive.google.com/file/d/' + file.getId() + '/view', id: file.getId() };
+  }
+
+  if (a === 'setSecret') { // حفظ مفتاح Claude API في خصائص السكربت (لا يظهر لأي مستخدم)
+    if (me.role !== 'admin') return { ok: false, error: 'للمدير فقط' };
+    PropertiesService.getScriptProperties().setProperty('ANTHROPIC_KEY', String(r.value || '').trim());
+    return { ok: true, has: !!r.value };
+  }
+  if (a === 'hasSecret') return { ok: true, has: !!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY') };
+
+  if (a === 'aiGrade') { // قراءة ورقة إجابة الطالب وتصحيحها بالذكاء الاصطناعي
+    var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY');
+    if (!key) return { ok: false, error: 'لم يُضف مفتاح Claude API — الإعدادات ← الاختبارات' };
+    var content = (r.images || []).map(function (im) { return { type: 'image', source: { type: 'base64', media_type: im.mime, data: im.data } }; });
+    content.push({ type: 'text', text: r.prompt });
+    var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      payload: JSON.stringify({ model: r.model || 'claude-sonnet-5-5', max_tokens: 4000, messages: [{ role: 'user', content: content }] })
+    });
+    var code = resp.getResponseCode(); var body = resp.getContentText();
+    if (code !== 200) return { ok: false, error: 'خطأ من خدمة التصحيح (' + code + '): ' + body.slice(0, 300) };
+    var j = JSON.parse(body); var txt = (j.content || []).map(function (c) { return c.text || ''; }).join('');
+    return { ok: true, text: txt };
   }
 
   if (a === 'sendWA') { // إرسال تلقائي عبر مزود واتساب (اختياري)
@@ -288,7 +326,7 @@ function route_(r) {
 
 function publicSettings_(s) {
   var keys = ['orgName', 'branchName', 'complexName', 'programName', 'supervisor', 'logoRight', 'logoLeft', 'regClosed', 'regNote',
-    'gradeLabels', 'workDays', 'year', 'years', 'zad', 'features', 'parentShowFees', 'parentShowDisc', 'parentShowRank', 'feeDefault', 'currency', 'phone', 'regFields'];
+    'gradeLabels', 'workDays', 'year', 'years', 'zad', 'features', 'parentShowFees', 'parentShowDisc', 'parentShowRank', 'parentShowExams', 'parentShowMedia', 'examScale', 'examReportShow', 'curricula', 'feeDefault', 'currency', 'phone', 'regFields'];
   var o = {}; keys.forEach(function (k) { if (s[k] !== undefined) o[k] = s[k]; });
   return o;
 }

@@ -274,3 +274,24 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .login .box .lg img{height:70px;max-width:45%;object-fit:contain}
 .qr{display:inline-block;background:#fff;padding:10px;border-radius:12px;border:1px solid var(--line)}
 @media (max-width:560px){.stu-card .top{flex-wrap:wrap}.stu-card .nm{min-width:60%}.stu-card .att{width:100%;justify-content:space-between}.stu-card .att button{flex:1}.daybar .inp{font-size:14px}}
+/* ——— الاختبارات ——— */
+details.mdrop{position:relative}
+details.mdrop summary{list-style:none;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+details.mdrop summary::-webkit-details-marker{display:none}
+details.mdrop summary::after{content:'▾';float:left;color:var(--muted)}
+.mpanel{position:absolute;z-index:60;top:calc(100% + 4px);right:0;left:0;min-width:260px;max-height:340px;overflow:auto;background:#fff;border:1.5px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:10px}
+.mgh{background:var(--teal-3);border-radius:8px;padding:4px 8px;margin:6px 0 2px;font-size:13px}
+.mit{display:flex;gap:6px;align-items:center;padding:4px 6px;border-radius:8px;font-size:13.5px;cursor:pointer}
+.mit:hover{background:#f6f3eb}
+.xq{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff}
+.xq .qn{background:var(--teal-3);color:var(--teal);border-radius:50%;min-width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center}
+.xbar{position:sticky;bottom:70px;z-index:15;border:2px solid var(--gold)}
+@media (min-width:861px){.xbar{bottom:10px}}
+.xtypes td{padding:4px}
+.ring-sm{width:54px;height:54px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:conic-gradient(var(--c) calc(var(--p)*1%),#ece8dd 0);position:relative;flex-shrink:0}
+.ring-sm::before{content:'';position:absolute;inset:6px;background:#fff;border-radius:50%}
+.ring-sm b{position:relative;font-size:12px;color:var(--ink)}
+.exam-card{border-top:4px solid var(--gold)}
+details.pexam{border:1px solid var(--line);border-radius:14px;padding:8px 10px;margin-bottom:8px;background:#fff}
+details.pexam summary{display:flex;gap:10px;align-items:center;cursor:pointer;list-style:none}
+details.pexam summary::-webkit-details-marker{display:none}

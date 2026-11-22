@@ -8,13 +8,13 @@ async function viewParent(root, tokenP) {
     try {
       const r = await api('parent', { t: tokenP });
       if (!r.ok) { root.innerHTML = `<div class="splash"><div style="font-size:50px">⚠️</div><div>${esc(r.error)}</div></div>`; return; }
-      S.data = { students: [], classes: [], users: [], records: [], payments: [], invites: [], settings: [Object.assign({ id: 'main' }, r.settings)] };
+      S.data = { students: [], classes: [], users: [], records: [], payments: [], invites: [], exams: [], results: [], settings: [Object.assign({ id: 'main' }, r.settings)] };
       S.data.students = r.mates.map(m => ({ id: m.id, name: m.name, status: 'active', classId: r.student.classId }));
       const i = S.data.students.findIndex(x => x.id === r.student.id); if (i >= 0) S.data.students[i] = Object.assign({ status: 'active' }, r.student); else S.data.students.push(r.student);
       if (r.cls) S.data.classes = [r.cls];
       if (r.teacher && r.cls) S.data.users = [{ id: r.cls.teacherId, name: r.teacher.name, phone: r.teacher.phone }];
       S.data.records = r.mateRecords.filter(x => x.studentId !== r.student.id).map(x => Object.assign({ id: x.studentId + '|' + x.date, classId: r.student.classId }, x)).concat(r.records);
-      S.data.payments = r.payments || [];
+      S.data.payments = r.payments || []; S.data.exams = r.exams || []; S.data.results = r.results || [];
       s = byId('students', r.student.id);
     } catch (e) { root.innerHTML = '<div class="splash"><div style="font-size:50px">📡</div><div>تعذر الاتصال، تحقق من الإنترنت وأعد المحاولة</div><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>'; return; }
   } else {
@@ -69,6 +69,7 @@ function drawParent(root, s) {
         <div class="noor-path">${NOORANIA.map((l, i) => `<span class="${lastNoor ? (i + 1 < lastNoor.noor.lesson ? 'done' : i + 1 === lastNoor.noor.lesson ? 'cur' : '') : ''}" title="${esc(l.title)}">${i + 1}</span>`).join('')}</div></div>` : ''}
       ${f.zad && subj.includes('zad') ? `<div class="card"><h3>🌸 زاد الطفل المسلم</h3><div class="badges">${zadCurriculum().map(z => { const got = [...new Set(zadAll.filter(x => x.cat === z.id).map(x => x.item))]; return `<div class="badge-it" style="border-color:${got.length ? z.color : ''}"><span class="e">${z.icon}</span><b>${esc(z.name)}</b><div>${got.length} / ${z.items.length}</div></div>`; }).join('')}</div>
         ${zadAll.length ? `<div class="small" style="margin-top:10px;line-height:2">${zadCurriculum().map(z => { const got = [...new Set(zadAll.filter(x => x.cat === z.id).map(x => x.item))]; return got.length ? `<b>${z.icon} ${esc(z.name)}:</b> ${got.map(esc).join('، ')}` : ''; }).filter(Boolean).join('<br>')}</div>` : ''}</div>` : ''}
+      ${S.settings.parentShowExams !== false ? parentExamsCard(s) : ''}
       <div class="card"><h3>📅 الحضور — ${MONTHS[parseISO(m1).getMonth()]}</h3><div class="cal">${cal}</div><div class="row small" style="margin-top:8px"><span class="chip green">حاضر</span><span class="chip red">غائب</span><span class="chip gold">متأخر</span><span class="chip blue">مستأذن</span></div></div>
       <div class="card"><h3>🗒️ السجل اليومي — ${lbl}</h3><div class="timeline">${timeline.length ? timeline.map(r => `<div class="ti"><div class="dt">${fmtDate(r.date)} <span class="small muted">${hijri(r.date)}</span></div>${parentDay(r, subj)}</div>`).join('') : '<div class="empty small">لا توجد تسجيلات في هذه الفترة</div>'}</div></div>
       ${f.fees && st.parentShowFees !== false && (fee > 0 || (st.parentShowDisc && (s.feeExempt || discountsOf(s).total))) ? `<div class="card"><h3>💰 الرسوم</h3>${s.feeExempt && st.parentShowDisc ? '<div class="chip gray" style="font-size:14px;padding:8px 14px">🎓 الطالب معفى من الرسوم</div>' : ''}${st.parentShowDisc && discountsOf(s).total && !s.feeExempt ? `<div class="small" style="margin-bottom:8px">الرسوم الأساسية ${num(discountsOf(s).base)} ${st.currency}${discountsOf(s).sib ? ' — خصم الأخوة ' + num(discountsOf(s).sib) : ''}${discountsOf(s).spec ? ' — خصم خاص ' + num(discountsOf(s).spec) : ''}</div>` : ''}${s.feeExempt ? '' : kpis([[num(fee), st.parentShowDisc && discountsOf(s).total ? 'المستحق بعد الخصم' : 'الرسوم المقررة'], [num(paid), 'المسدد'], [num(Math.max(0, fee - paid)), 'المتبقي']])}${pays.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الإيصال</th></tr>${pays.map(p => `<tr><td>${fmtDate(p.date, false)}</td><td><b>${num(p.amount)}</b> ${st.currency}</td><td class="small">${esc(p.note || p.method || '')}</td><td>${p.receiptUrl ? `<a class="btn sm light" target="_blank" href="${esc(p.receiptUrl)}">📎 عرض</a>` : '—'}</td></tr>`).join('')}</table>` : ''}</div>` : ''}
@@ -96,6 +97,7 @@ function parentDay(r, subj) {
     L.push(`<div style="margin-top:4px"><b>✏️ الأخطاء والتصويب:</b>${r.errors.map(e => `<div class="small" style="padding:3px 0">${errText(e)}</div>`).join('')}</div>`);
     ['hifz', 'review', 'far'].forEach(k => { const errs = r.errors.filter(e => e.sub === k && e.word); if (errs.length && r[k]) { const box = ayahBoxHTML(r[k], errs); if (box) L.push(box.replace('class="ayah-box"', 'class="ayah-box" style="font-size:20px;max-height:200px"')); } });
   }
+  if (S.settings.parentShowMedia !== false && (r.media || []).some(x => x.share)) L.push(mediaPlayers(r.media));
   if (r.note) L.push(`<div style="background:#fffbea;border-radius:10px;padding:6px 10px;margin-top:4px">📝 <b>ملاحظة المعلم:</b> ${esc(r.note)}</div>`);
   return L.map(x => `<div class="ln">${x}</div>`).join('') || '<div class="ln"><span class="chip green">حاضر</span></div>';
 }

@@ -7,6 +7,7 @@ function NAV() {
     { k: 'students', t: 'الطلاب', ic: '👦', badge: canAdmin() && pend ? pend : '' },
     canAdmin() && { k: 'register', t: 'رابط التسجيل', ic: '📨' },
     canAdmin() && { k: 'classes', t: 'الفصول والمعلمون', ic: '🏫' },
+    { k: 'exams', t: 'الاختبارات', ic: '📝' },
     { k: 'reports', t: 'التقارير', ic: '📊' },
     f.leaders && { k: 'leaders', t: 'الأوائل والترتيب', ic: '🏆' },
     canAdmin() && f.fees && { k: 'fees', t: 'الرسوم', ic: '💰' },
@@ -55,6 +56,8 @@ function statsOf(sid, from, to) {
     (r.errors || []).forEach(e => { o.errors++; if (e.fixed) o.fixed++; });
   });
   o.reviewAll = o.review + o.far;
+  const exr = T('results').filter(r => r.studentId === sid && (!from || r.date >= from) && (!to || r.date <= to)).map(r => { const ex = byId('exams', r.examId); return ex ? resTotals(ex, r).pct : null; }).filter(x => x != null);
+  o.exams = exr.length; o.examPct = exr.length ? Math.round(exr.reduce((a, b) => a + b, 0) / exr.length) : 0;
   o.total = o.hifz + o.review + o.far;
   o.gavg = o.gcnt ? o.gsum / o.gcnt : 0;
   o.attPct = o.days ? Math.round((o.p + o.l) / o.days * 100) : 0;
@@ -584,9 +587,9 @@ function viewLeaders(v) {
     <div class="card" style="padding:10px"><div class="row">
       <div class="tabs" style="margin:0">${[['day', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر'], ['all', 'منذ البداية'], ['custom', 'من–إلى']].map(([k, t]) => `<button data-k="${k}" class="${p.k === k ? 'on' : ''}">${t}</button>`).join('')}</div>
       ${p.k === 'custom' ? `<input type="date" class="inp" id="lf" value="${from}" style="width:auto"><input type="date" class="inp" id="lt" value="${to}" style="width:auto">` : ''}
-      <select class="inp" id="lby" style="width:auto"><option value="total" ${p.by === 'total' ? 'selected' : ''}>حسب الأوجه (حفظ+مراجعة)</option><option value="points" ${p.by === 'points' ? 'selected' : ''}>حسب النقاط الشاملة</option><option value="hifz" ${p.by === 'hifz' ? 'selected' : ''}>حسب الحفظ فقط</option><option value="noorItems" ${p.by === 'noorItems' ? 'selected' : ''}>حسب النورانية</option></select></div>
+      <select class="inp" id="lby" style="width:auto"><option value="total" ${p.by === 'total' ? 'selected' : ''}>حسب الأوجه (حفظ+مراجعة)</option><option value="points" ${p.by === 'points' ? 'selected' : ''}>حسب النقاط الشاملة</option><option value="hifz" ${p.by === 'hifz' ? 'selected' : ''}>حسب الحفظ فقط</option><option value="noorItems" ${p.by === 'noorItems' ? 'selected' : ''}>حسب النورانية</option><option value="examPct" ${p.by === 'examPct' ? 'selected' : ''}>حسب متوسط الاختبارات</option></select></div>
       <div class="small muted" style="margin-top:6px">النقاط الشاملة = الحفظ×10 + المراجعة×3 + التقديرات + الحضور + النورانية + زاد الطفل + السلوك</div></div>
-    ${classes.map(c => { const rk = rankClass(c.id, from, to, p.by); const max = Math.max(1, ...rk.map(x => x.o[p.by])); const u = p.by === 'points' ? 'نقطة' : p.by === 'noorItems' ? 'بند' : 'وجه'; return `<div class="card"><h3>${esc(c.name)} <span class="muted small">— ${esc((teacherOf(c) || {}).name || '')}</span></h3>
+    ${classes.map(c => { const rk = rankClass(c.id, from, to, p.by); const max = Math.max(1, ...rk.map(x => x.o[p.by])); const u = p.by === 'points' ? 'نقطة' : p.by === 'noorItems' ? 'بند' : p.by === 'examPct' ? '٪' : 'وجه'; return `<div class="card"><h3>${esc(c.name)} <span class="muted small">— ${esc((teacherOf(c) || {}).name || '')}</span></h3>
       ${rk.length >= 1 ? `<div class="podium">${[1, 0, 2].map(i => rk[i] ? `<div class="p p${i + 1}"><div class="nm">${esc(rk[i].s.name.split(' ').slice(0, 2).join(' '))}</div><div class="sc">${num(rk[i].o[p.by])} ${u}</div><div class="blk">${['🥇', '🥈', '🥉'][i]}</div></div>` : '<div class="p"></div>').join('')}</div>` : ''}
       ${rk.map(x => `<div class="rank-row"><div class="r">${x.rank}</div><div style="flex:1"><b>${esc(x.s.name)}</b><div class="small muted">حفظ ${num(x.o.hifz)} · مراجعة ${num(x.o.reviewAll)} · حضور ${x.o.p + x.o.l}/${x.o.days} · ${x.o.points} نقطة · ${levelOf(x.o)}</div><div class="bar"><i style="width:${x.o[p.by] / max * 100}%"></i></div></div></div>`).join('') || '<div class="empty small">لا يوجد طلاب</div>'}</div>`; }).join('') || '<div class="card empty">لا توجد فصول</div>'}`;
   const setP = o => { sessionStorage.setItem('ld', JSON.stringify(Object.assign(p, o))); render(); };
@@ -619,7 +622,7 @@ function viewSettings(v, sub) {
   const st = S.settings; const f = features();
   const FEATS = [['quran', '📖 متابعة القرآن (حفظ ومراجعة)'], ['noor', '🔤 القاعدة النورانية'], ['zad', '🌸 زاد الطفل المسلم'], ['voice', '🎤 الإدخال الصوتي'], ['behavior', '⭐ تقييم السلوك'], ['fees', '💰 الرسوم'], ['leaders', '🏆 الأوائل والترتيب'], ['parentPage', '👨‍👩‍👦 صفحة الطالب لولي الأمر']];
   v.innerHTML = `<div class="page-head"><h2>⚙️ الإعدادات</h2></div>
-  <div class="tabs">${[['general', 'عام'], ['server', '☁️ الربط بالخادم'], ['features', 'الخصائص'], ['curricula', '📚 المناهج'], ['zad', 'منهج زاد الطفل'], ['wa', 'رسائل الواتساب'], ['backup', 'النسخ الاحتياطي']].map(([k, t]) => `<button data-t="${k}" class="${(sub || 'general') === k ? 'on' : ''}">${t}</button>`).join('')}</div><div id="sv"></div>`;
+  <div class="tabs">${[['general', 'عام'], ['server', '☁️ الربط بالخادم'], ['features', 'الخصائص'], ['curricula', '📚 المناهج'], ['exams', '📝 الاختبارات'], ['zad', 'منهج زاد الطفل'], ['wa', 'رسائل الواتساب'], ['backup', 'النسخ الاحتياطي']].map(([k, t]) => `<button data-t="${k}" class="${(sub || 'general') === k ? 'on' : ''}">${t}</button>`).join('')}</div><div id="sv"></div>`;
   $$('.tabs button', v).forEach(b => b.onclick = () => location.hash = '#/settings/' + b.dataset.t);
   const box = $('#sv'); sub = sub || 'general';
   if (sub === 'general') {
@@ -659,6 +662,7 @@ function viewSettings(v, sub) {
   }
   if (sub === 'server') serverSettings(box);
   if (sub === 'curricula') curriculaSettings(box);
+  if (sub === 'exams') examSettings(box);
   if (sub === 'backup') {
     box.innerHTML = `<div class="card"><h3>💾 النسخ الاحتياطي</h3><div class="row"><button class="btn" id="bk">⬇️ تنزيل نسخة احتياطية</button><label class="btn light">⬆️ استعادة نسخة<input type="file" id="rs" accept=".json" hidden></label></div></div>
       <div class="card"><h3>📦 استيراد حزمة بيانات جاهزة (دمج)</h3><p class="small muted">لملفات البيانات التي يجهزها Claude (طلاب + معلمون + فصول + رسوم وإيصالات). تُدمج مع الموجود دون حذف شيء، ويمكن إعادة الاستيراد بأمان دون تكرار.</p><label class="btn gold">📦 اختيار ملف الحزمة (.json)<input type="file" id="pack" accept=".json" hidden></label></div>

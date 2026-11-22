@@ -85,7 +85,7 @@ function recordEditor(s, date) {
   const c = classOf(s); const subj = classSubjects(c); const f = features();
   const orig = getRec(s.id, date);
   const r = JSON.parse(JSON.stringify(orig || newRec(s, date)));
-  r.classId = s.classId; r.errors = r.errors || []; r.zad = r.zad || []; r.cur = r.cur || {};
+  r.classId = s.classId; r.errors = r.errors || []; r.zad = r.zad || []; r.cur = r.cur || {}; r.media = r.media || [];
   if (!r.att) r.att = 'p';
   const body = document.createElement('div');
   const list = studentsOfClass(s.classId); const idx = list.findIndex(x => x.id === s.id); const next = list[idx + 1];
@@ -120,6 +120,7 @@ function recordEditor(s, date) {
     }
     subj.filter(isCur).forEach(cid => { h += curEditorHTML(cid, r.cur[cid], s.id, date); });
     h += sec('errs', '✏️ الأخطاء والتصويب', `<div class="small muted" style="margin-bottom:6px">${subj.includes('quran') ? 'في جزء عم: اضغط على الكلمة الخاطئة في نص الآيات أعلاه لتسجيلها. ' : ''}أو أضف الخطأ يدوياً:</div><div class="err-list" id="elist"></div><button class="btn sm light" id="eadd">➕ إضافة خطأ</button>`);
+    h += `<div class="sec"><div class="sec-h">🎙️ تسجيل التسميع<span class="sp"></span>${mediaSupported() ? '<button type="button" class="btn sm gold" data-rec="audio">🎙️ صوت</button><button type="button" class="btn sm light" data-rec="video">🎥 فيديو</button>' : ''}</div><div id="emedia">${mediaListHTML(r.media, true) || '<div class="small muted">سجّل تسميع الطالب بالصوت أو الفيديو، واختر إرساله لولي الأمر ليظهر في صفحة ابنه.</div>'}</div></div>`;
     h += sec('note', '📝 ملاحظات المعلم', `${f.behavior ? `<div class="row" style="margin-bottom:8px"><span>السلوك والانضباط:</span><span id="beh">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-b="${n}" style="border:0;background:none;font-size:26px;cursor:pointer;color:${(r.behavior || 0) >= n ? '#e2b93b' : '#ddd'}">★</button>`).join('')}</span></div>` : ''}<textarea class="inp" id="enote" placeholder="ملاحظة تظهر لولي الأمر في صفحة الطالب">${esc(r.note || '')}</textarea>
       <div class="row small" style="margin-top:6px">${['أحسنت، ممتاز 👏', 'يحتاج مراجعة في البيت', 'تحسن ملحوظ', 'يحتاج تركيزاً أكثر', 'نرجو الحرص على الحضور مبكراً'].map(t => `<button type="button" class="chip" data-qn="${t}" style="border:0;cursor:pointer">${t}</button>`).join('')}</div>`);
     eb.innerHTML = h;
@@ -211,6 +212,8 @@ function recordEditor(s, date) {
       });
       return;
     }
+    const rb = t.closest('[data-rec]'); if (rb) { const what = [r.hifz && r.hifz.s1 ? 'حفظ ' + Q.rangeText(r.hifz) : '', r.review && r.review.s1 ? 'مراجعة ' + Q.rangeText(r.review) : ''].filter(Boolean).join(' — ') || 'تسميع'; recordMedia(rb.dataset.rec, s.name.split(' ')[0] + ': ' + what + ' (' + fmtDate(date, false) + ')').then(x => { if (x) { r.media.push(x); save('records', Object.assign({}, r)); drawBody(); } }); return; }
+    const msh = t.closest('[data-mshare]'), mdl = t.closest('[data-mdel]'); if (msh || mdl) { if (msh) r.media[+msh.dataset.mshare].share = !r.media[+msh.dataset.mshare].share; else r.media.splice(+mdl.dataset.mdel, 1); drawBody(); return; }
     const ms = t.closest('[data-msur]'); if (ms) { const [k, n] = ms.dataset.msur.split('|'); const sn = +n; $(`[data-rp="${k}"]`, eb)._rp.set({ s1: sn, a1: 1, s2: sn, a2: Q.count(sn) }); return; }
     const cs = t.closest('[data-csug]'); if (cs) { r.cur[cs.dataset.csug] = curSuggest(s.id, date, cs.dataset.csug); drawBody(); return; }
     const ca = t.closest('[data-call]'); if (ca) { const cid = ca.dataset.call; const x = r.cur[cid]; x.items = curById(cid).lessons[x.lesson - 1].items.map((_, i) => i); x.errs = []; drawBody(); return; }

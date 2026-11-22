@@ -1,5 +1,5 @@
 /* ===== النواة: البيانات والتخزين والاتصال بالخادم وأدوات عامة ===== */
-const TABLE_NAMES = ['students', 'classes', 'users', 'records', 'payments', 'invites', 'settings'];
+const TABLE_NAMES = ['students', 'classes', 'users', 'records', 'payments', 'invites', 'exams', 'results', 'settings'];
 const LS = { data: 'tz_data', sess: 'tz_session', server: 'tz_server', queue: 'tz_queue' };
 
 const DEFAULT_SETTINGS = {
@@ -99,7 +99,7 @@ function yearRange(name) {
 }
 const T = t => {
   const a = S.data[t];
-  if (t === 'records' || t === 'payments') { const [f, to] = yearRange(S.viewYear); if (!f && !to) return a; return a.filter(x => (!f || x.date >= f) && (!to || x.date <= to)); }
+  if (t === 'records' || t === 'payments' || t === 'exams' || t === 'results') { const [f, to] = yearRange(S.viewYear); if (!f && !to) return a; return a.filter(x => (!f || x.date >= f) && (!to || x.date <= to)); }
   if (viewingArchive()) {
     const y = S.viewYear;
     if (t === 'students') return a.filter(s => s.history && s.history[y]).map(s => Object.assign({}, s, s.history[y], { status: 'active' }));
@@ -146,6 +146,13 @@ function remove(table, id) {
 }
 function saveSettings(patch) { const cur = (S.data.settings || []).find(x => x.id === 'main') || { id: 'main' }; save('settings', Object.assign({}, cur, patch)); }
 
+async function uploadFile(dataURL, name, folder) {
+  if (isLocal()) throw new Error('الرفع يحتاج الربط بالخادم');
+  const m = String(dataURL).match(/^data:([^;]+);base64,(.*)$/); if (!m) throw new Error('ملف غير صالح');
+  const r = await api('upload', { name, mime: m[1].split(';')[0], data: m[2], folder });
+  if (!r.ok) throw new Error(r.error || 'تعذر الرفع'); return r.url;
+}
+const drivePreview = u => String(u || '').replace(/\/view(\?.*)?$/, '/preview');
 async function api(action, payload = {}, server) {
   const url = server || S.server;
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, token: S.token }, payload)), redirect: 'follow' });

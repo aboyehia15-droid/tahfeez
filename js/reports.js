@@ -1,6 +1,6 @@
 /* ===================== التقارير ===================== */
 const REPORTS = [
-  ['student', '👦 تقرير طالب شامل'], ['week', '🗓️ جدول الأسبوع (كشف المتابعة)'], ['class', '🏫 التقرير الإجمالي للفصل والترتيب'],
+  ['student', '👦 تقرير طالب شامل'], ['exam', '📝 تقرير درجات اختبار (لكل طالب)'], ['examclass', '📋 كشف درجات الاختبار للفصل'], ['week', '🗓️ جدول الأسبوع (كشف المتابعة)'], ['class', '🏫 التقرير الإجمالي للفصل والترتيب'],
   ['all', '🧭 لوحة المشرف (كل الفصول والمعلمين)'], ['att', '📅 تقرير الحضور والغياب'], ['noor', '🔤 تقرير النورانية'], ['zad', '🌸 تقرير زاد الطفل'],
   ['cur', '📚 تقرير المناهج (الحروف والأرقام…)'], ['errors', '✏️ تقرير الأخطاء والتصويب'], ['fees', '💰 تقرير الرسوم']
 ];
@@ -14,24 +14,27 @@ function viewReports(v, sub, arg) {
   if (REP.type === 'week') REP.period = 'week';
   const types = REPORTS.filter(r => (r[0] !== 'fees' || (canAdmin() && features().fees)) && (r[0] !== 'all' || canAdmin()) && (r[0] !== 'noor' || features().noor) && (r[0] !== 'zad' || features().zad));
   const studs = studentsOfClass(REP.cls);
-  if (REP.type === 'student' && !studs.some(s => s.id === REP.stu)) REP.stu = (studs[0] || {}).id || '';
+  if ((REP.type === 'student' || REP.type === 'exam') && !studs.some(s => s.id === REP.stu)) REP.stu = (studs[0] || {}).id || '';
   const needCls = !['all', 'fees'].includes(REP.type) || REP.type === 'fees';
   v.innerHTML = `<div class="page-head"><h2>📊 التقارير</h2><span class="sp"></span><button class="btn" id="rprint">🖨️ طباعة / PDF</button><button class="btn light" id="rxls">📤 Excel</button>${REP.type === 'student' && REP.stu && features().parentPage ? '<button class="btn wa" id="rwa">💬 إرسال لولي الأمر</button>' : ''}</div>
     <div class="card rep-controls no-print" style="padding:12px">
       <div class="grid g3">
         <div class="field"><label>نوع التقرير</label><select class="inp" id="rt">${types.filter(t => t[0] !== 'cur').map(([k, t]) => `<option value="${k}" ${REP.type === k ? 'selected' : ''}>${t}</option>`).join('')}<optgroup label="📚 المناهج">${curricula().map(c => `<option value="cur:${c.id}" ${REP.type === 'cur' && REP.cur === c.id ? 'selected' : ''}>${c.icon} تقرير ${esc(c.name)}</option>`).join('')}</optgroup></select></div>
         ${needCls ? `<div class="field"><label>الفصل</label><select class="inp" id="rc">${REP.type === 'fees' ? '<option value="">كل الفصول</option>' : ''}${classes.map(c => `<option value="${c.id}" ${REP.cls === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>` : ''}
-        ${REP.type === 'student' ? `<div class="field"><label>الطالب</label><select class="inp" id="rs" ${REP.allStu ? 'disabled' : ''}>${studs.map(s => `<option value="${s.id}" ${REP.stu === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
+        ${REP.type === 'student' || REP.type === 'exam' ? `<div class="field"><label>الطالب</label><select class="inp" id="rs" ${REP.allStu ? 'disabled' : ''}>${studs.map(s => `<option value="${s.id}" ${REP.stu === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
       </div>
-      ${REP.type !== 'fees' ? `<div class="row" style="margin-top:4px"><div class="tabs" style="margin:0">${(REP.type === 'week' ? [['week', 'أسبوع']] : [['day', 'يومي'], ['week', 'أسبوعي'], ['month', 'شهري'], ['custom', 'من تاريخ إلى تاريخ'], ['all', 'منذ البداية']]).map(([k, t]) => `<button data-p="${k}" class="${REP.period === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+      ${REP.type === 'exam' || REP.type === 'examclass' ? examReportControls() : ''}
+      ${!['fees', 'exam', 'examclass'].includes(REP.type) ? `<div class="row" style="margin-top:4px"><div class="tabs" style="margin:0">${(REP.type === 'week' ? [['week', 'أسبوع']] : [['day', 'يومي'], ['week', 'أسبوعي'], ['month', 'شهري'], ['custom', 'من تاريخ إلى تاريخ'], ['all', 'منذ البداية']]).map(([k, t]) => `<button data-p="${k}" class="${REP.period === k ? 'on' : ''}">${t}</button>`).join('')}</div>
         ${REP.period === 'custom' ? `<input type="date" class="inp" id="rf" value="${REP.from || REP.ref}" style="width:auto"> <span>إلى</span> <input type="date" class="inp" id="rto" value="${REP.to || REP.ref}" style="width:auto">` : REP.period !== 'all' ? `<input type="date" class="inp" id="rref" value="${REP.ref}" style="width:auto"><span class="small muted">${REP.period === 'week' ? 'اختر أي يوم من الأسبوع' : REP.period === 'month' ? 'اختر أي يوم من الشهر' : ''}</span>` : ''}</div>` : ''}
-      ${REP.type === 'student' ? `<div class="row small" style="margin-top:8px">${[['quran', '📖 القرآن'], ['noor', '🔤 النورانية'], ['zad', '🌸 زاد الطفل'], ['att', '📅 الحضور'], ['notes', '📝 الملاحظات والأخطاء'], ['fees', '💰 الرسوم']].filter(([k]) => k === 'att' || k === 'notes' || features()[k]).map(([k, t]) => `<label class="chip"><input type="checkbox" class="rsub" value="${k}" ${REP.subs[k] ? 'checked' : ''}> ${t}</label>`).join('')}${curricula().filter(c => classSubjects(byId('classes', REP.cls) || classOf(byId('students', REP.stu))).includes(c.id)).map(c => `<label class="chip" style="background:${c.color}22;color:${c.color}"><input type="checkbox" class="rsub" value="c_${c.id}" ${REP.subs['c_' + c.id] !== 0 ? 'checked' : ''}> ${c.icon} ${esc(c.name)}</label>`).join('')}<label class="chip gold"><input type="checkbox" id="rall" ${REP.allStu ? 'checked' : ''}> تقارير جميع طلاب الفصل</label></div>` : ''}
+      ${REP.type === 'student' ? `<div class="row small" style="margin-top:8px">${[['quran', '📖 القرآن'], ['noor', '🔤 النورانية'], ['zad', '🌸 زاد الطفل'], ['att', '📅 الحضور'], ['notes', '📝 الملاحظات والأخطاء'], ['fees', '💰 الرسوم'], ['exams', '📝 الاختبارات']].filter(([k]) => k === 'att' || k === 'notes' || k === 'exams' || features()[k]).map(([k, t]) => `<label class="chip"><input type="checkbox" class="rsub" value="${k}" ${REP.subs[k] ? 'checked' : ''}> ${t}</label>`).join('')}${curricula().filter(c => classSubjects(byId('classes', REP.cls) || classOf(byId('students', REP.stu))).includes(c.id)).map(c => `<label class="chip" style="background:${c.color}22;color:${c.color}"><input type="checkbox" class="rsub" value="c_${c.id}" ${REP.subs['c_' + c.id] !== 0 ? 'checked' : ''}> ${c.icon} ${esc(c.name)}</label>`).join('')}<label class="chip gold"><input type="checkbox" id="rall" ${REP.allStu ? 'checked' : ''}> تقارير جميع طلاب الفصل</label></div>` : ''}
       ${REP.type === 'week' ? `<label class="row small" style="margin-top:8px"><input type="checkbox" id="rblank" ${REP.blank ? 'checked' : ''}> نموذج فارغ للتعبئة الورقية</label>` : ''}
     </div>
     <div id="rout"></div>`;
   const re = () => render();
   $('#rt').onchange = e => { REP.type = e.target.value; if (REP.type.startsWith('cur:')) { REP.cur = REP.type.slice(4); REP.type = 'cur'; } if (REP.type !== 'week' && REP.period === 'week' && REP.type !== 'student') REP.period = 'month'; re(); };
   const rc = $('#rc'); if (rc) rc.onchange = e => { REP.cls = e.target.value; REP.stu = ''; re(); };
+  const rex = $('#rexam'); if (rex) rex.onchange = e => { REP.exam = e.target.value; re(); };
+  $$('.rshow', v).forEach(c => c.onchange = () => { REP.show[c.value] = c.checked ? 1 : 0; re(); });
   const rcu = $('#rcur'); if (rcu) rcu.onchange = e => { REP.cur = e.target.value; re(); };
   const rs = $('#rs'); if (rs) rs.onchange = e => { REP.stu = e.target.value; re(); };
   $$('[data-p]', v).forEach(b => b.onclick = () => { REP.period = b.dataset.p; re(); });
@@ -44,6 +47,8 @@ function viewReports(v, sub, arg) {
   const out = $('#rout');
   const periodLbl = REP.period === 'all' ? 'منذ البداية' : from === to ? fmtDate(from) + ' — ' + hijri(from) : 'من ' + fmtDate(from, false) + ' إلى ' + fmtDate(to, false) + (REP.period === 'month' ? ' (' + MONTHS[parseISO(from).getMonth()] + ')' : '');
   const R = {
+    exam: () => examReportOut(studs, true),
+    examclass: () => examReportOut(studs, false),
     student: () => REP.allStu ? studs.map((s, i) => `<div class="report ${i < studs.length - 1 ? 'page-break' : ''}" style="margin-bottom:14px">${studentReport(s, from, to, periodLbl, REP.subs)}</div>`).join('') : REP.stu ? `<div class="report">${studentReport(byId('students', REP.stu), from, to, periodLbl, REP.subs)}</div>` : '<div class="card empty">لا يوجد طلاب</div>',
     week: () => `<div class="report">${weekReport(REP.cls, from, REP.blank)}</div>`,
     class: () => `<div class="report">${classReport(REP.cls, from, to, periodLbl)}</div>`,
@@ -91,6 +96,7 @@ function studentReport(s, from, to, periodLbl, subs) {
     const zr = []; rs.forEach(r => (r.zad || []).forEach(z => zr.push(Object.assign({ date: r.date }, z))));
     h += `<div class="rep-sec">🌸 زاد الطفل المسلم</div>` + (zr.length ? `<table class="tbl"><tr><th>التاريخ</th><th>المجال</th><th>البند</th><th>التقدير</th></tr>${zr.map(z => { const cat = zadCurriculum().find(c => c.id === z.cat) || {}; return `<tr><td>${fmtDate(z.date)}</td><td>${cat.icon || ''} ${esc(cat.name || '')}</td><td class="r">${esc(z.item)}</td><td>${gradeLabel(z.grade)}</td></tr>`; }).join('')}</table>` : '<div class="muted small">لا توجد تسجيلات</div>');
   }
+  if (subs.exams !== 0) h += studentExamsSection(s, from, to);
   if (subs.att) { const ab = rs.filter(r => r.att === 'a' || r.att === 'e' || r.att === 'l'); h += `<div class="rep-sec">📅 الحضور والغياب</div><div class="small">حاضر: <b>${o.p}</b> — متأخر: <b>${o.l}</b> — مستأذن: <b>${o.e}</b> — غائب: <b style="color:var(--red)">${o.a}</b> — نسبة الحضور: <b>${o.attPct}%</b></div>${ab.length ? `<div class="small" style="margin-top:4px">${ab.map(r => `<span class="chip ${r.att === 'a' ? 'red' : r.att === 'l' ? 'gold' : 'blue'}">${ATT[r.att][0]}: ${fmtDate(r.date)}</span>`).join(' ')}</div>` : ''}`; }
   if (subs.notes) {
     const nn = rs.filter(r => r.note || (r.errors && r.errors.length) || r.behavior);
@@ -192,4 +198,21 @@ function feesReport(cid) {
   h += kpis([[num(sum('b')), 'الرسوم الأساسية'], [num(sum('dsc')), 'الخصومات والإعفاءات'], [num(tf), 'صافي المستحق'], [num(tp), 'المسدد'], [num(Math.max(0, tf - tp)), 'المتبقي'], [tf ? Math.round(tp / tf * 100) + '%' : '—', 'نسبة التحصيل'], [rows.filter(x => x.s.feeExempt).length, '🎓 معفى'], [rows.filter(x => x.d.sib).length, '👨‍👦 خصم أخوة'], [rows.filter(x => x.d.spec).length, '⭐ خصم خاص']]);
   h += `<table class="tbl"><tr><th>م</th><th>الطالب</th><th>الفصل</th><th>الرسوم</th><th>الخصم / الإعفاء</th><th>الصافي</th><th>المسدد</th><th>المتبقي</th><th>الدفعات</th></tr>${rows.map((x, i) => `<tr><td>${i + 1}</td><td class="r">${esc(x.s.name)}</td><td>${esc((classOf(x.s) || {}).name || '')}</td><td>${num(x.d.base)}</td><td class="small">${x.d.total ? '<b>' + num(x.d.total) + '</b> ' : ''}${x.s.feeExempt ? 'معفى' + (x.s.exemptNote ? ' (' + esc(x.s.exemptNote) + ')' : '') : [x.d.sib ? 'أخوة' : '', x.d.spec ? 'خاص' + (x.s.specDisc.note ? ' (' + esc(x.s.specDisc.note) + ')' : '') : ''].filter(Boolean).join('، ')}</td><td><b>${num(x.f)}</b></td><td>${num(x.p)}</td><td style="font-weight:700;color:${x.f - x.p > 0 ? 'var(--red)' : ''}">${num(Math.max(0, x.f - x.p))}</td><td class="small">${T('payments').filter(p => p.studentId === x.s.id).map(p => num(p.amount) + ' (' + fmtDate(p.date, false) + ')' + (p.receiptUrl ? ' <a href="' + esc(p.receiptUrl) + '" target="_blank">📎</a>' : '')).join('، ')}</td></tr>`).join('')}<tr style="font-weight:800"><td colspan="3">الإجمالي</td><td>${num(sum('b'))}</td><td>${num(sum('dsc'))}</td><td>${num(tf)}</td><td>${num(tp)}</td><td>${num(Math.max(0, tf - tp))}</td><td></td></tr></table>`;
   return h;
+}
+
+/* ——— تقارير الاختبارات ——— */
+function examsForReport() { const my = myClasses().map(c => c.id); return T('exams').filter(e => canAdmin() || (e.classIds || []).some(c => my.includes(c))).sort((a, b) => a.date < b.date ? 1 : -1); }
+function examReportControls() {
+  const exs = examsForReport(); if (!exs.some(e => e.id === REP.exam)) REP.exam = (exs[0] || {}).id || '';
+  REP.show = REP.show || examShowOpts();
+  return `<div class="grid g3" style="margin-top:6px"><div class="field"><label>الاختبار</label><select class="inp" id="rexam">${exs.map(e => `<option value="${e.id}" ${REP.exam === e.id ? 'selected' : ''}>${EXAM_KIND_ICON[e.kind] || ''} ${esc(e.title)} (${fmtDate(e.date, false)})</option>`).join('') || '<option value="">لا توجد اختبارات</option>'}</select></div></div>
+    <div class="row small" style="margin-top:6px"><b>يُعرض في التقرير:</b>${REPORT_SHOW.filter(([k]) => REP.type === 'exam' || ['pct', 'grade', 'rank', 'notes'].includes(k)).map(([k, t]) => `<label class="chip"><input type="checkbox" class="rshow" value="${k}" ${REP.show[k] ? 'checked' : ''}> ${t}</label>`).join('')}${REP.type === 'exam' ? `<label class="chip gold"><input type="checkbox" id="rall" ${REP.allStu ? 'checked' : ''}> جميع طلاب الفصل</label>` : ''}</div>`;
+}
+function examReportOut(studs, perStudent) {
+  const ex = byId('exams', REP.exam); if (!ex) return '<div class="card empty"><span class="e">📝</span>لا توجد اختبارات — أنشئ اختباراً من شاشة الاختبارات</div>';
+  examTotals(ex); const show = REP.show || examShowOpts();
+  if (!(ex.classIds || []).includes(REP.cls)) return `<div class="card empty">الفصل المختار ليس ضمن فصول هذا الاختبار</div>`;
+  if (!perStudent) return `<div class="report">${examClassSheet(ex, REP.cls, show)}</div>`;
+  const list = REP.allStu ? studs : studs.filter(s => s.id === REP.stu);
+  return list.map((s, i) => `<div class="report ${i < list.length - 1 ? 'page-break' : ''}" style="margin-bottom:14px">${examStudentBlock(ex, s, show)}</div>`).join('') || '<div class="card empty">لا يوجد طلاب</div>';
 }
