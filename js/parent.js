@@ -2,7 +2,12 @@
 let PV = { k: 'month', f: '', t: '' };
 /* عرض مخصص من رابط الواتساب: يظهر فقط ما اختاره المعلم في الرسالة وللفترة المحددة */
 const PVIEW = (() => { const q = new URLSearchParams(location.search); let v = q.get('v') ? { v: q.get('v'), o: q.get('o') || '', f: q.get('f') || '', t: q.get('t') || '', x: q.get('x') || '' } : q.get('w') ? decodeView(q.get('w')) : null; if (!v) return null; return { v: v.v, o: new Set(String(v.o).split(',').filter(Boolean)), f: v.f, t: v.t, x: v.x }; })();
-if (PVIEW) { if (PVIEW.f || PVIEW.t) { PV.k = 'custom'; PV.f = PVIEW.f; PV.t = PVIEW.t || PVIEW.f; } else PV.k = 'all'; }
+if (PVIEW) {
+  if (PVIEW.f || PVIEW.t) { PV.k = 'custom'; PV.f = PVIEW.f; PV.t = PVIEW.t || PVIEW.f; } else PV.k = 'all';
+  const T0 = new Date(); const td = T0.getFullYear() + '-' + String(T0.getMonth() + 1).padStart(2, '0') + '-' + String(T0.getDate()).padStart(2, '0');
+  if (PV.k === 'custom' && PV.f === PV.t && PV.f === td) PV.k = 'day';
+  else if (PV.k === 'custom') { const d = new Date(td); const m1 = td.slice(0, 8) + '01'; const m2 = new Date(d.getFullYear(), d.getMonth() + 1, 0); const m2s = m2.getFullYear() + '-' + String(m2.getMonth() + 1).padStart(2, '0') + '-' + String(m2.getDate()).padStart(2, '0'); if (PV.f === m1 && PV.t === m2s) PV.k = 'month'; }
+}
 const PF = k => !PVIEW || PVIEW.o.has(k) || (k === 'far' && PVIEW.o.has('review')) || (k === 'note' && PVIEW.o.has('notes')) || (k === 'grade' && PVIEW.v !== 'daily') || (k === 'media' && PVIEW.v === 'period' && PVIEW.o.has('notes'));
 
 async function viewParent(root, tokenP) {
@@ -35,7 +40,7 @@ function drawParent(root, s) {
   const [from, to] = periodRange(PV.k, todayISO(), PV.f, PV.t);
   const o = statsOf(s.id, from, to); const all = recsOf(s.id); const cumul = allRecsOf(s.id);
   const rk = c && st.parentShowRank !== false ? rankClass(c.id, from, to).find(x => x.s.id === s.id) : null;
-  const lbl = PVIEW && PV.k === 'custom' ? (from === to ? 'يوم ' + fmtDate(from) : 'من ' + fmtDate(from, false) + ' إلى ' + fmtDate(to, false)) : { day: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', custom: 'الفترة المحددة', all: 'منذ البداية' }[PV.k];
+  const lbl = PV.k === 'custom' ? (from === to ? 'يوم ' + fmtDate(from) : 'من ' + fmtDate(from, false) + ' إلى ' + fmtDate(to, false)) : { day: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', custom: 'الفترة المحددة', all: 'منذ البداية' }[PV.k];
   const V = PVIEW ? PVIEW.v : ''; const full = !PVIEW; const per = V === 'period';
   const today = getRec(s.id, todayISO());
   const memo = memorizedSet(cumul); const prog = surahProgress(memo); const memPages = pagesOfSet(memo);
@@ -54,9 +59,9 @@ function drawParent(root, s) {
     <div class="p-hero"><div class="logos"><img src="${logoR()}"><img src="${logoL()}"></div>
       <h1>${esc(s.name)}</h1><div class="sub">🏫 ${esc(c ? c.name : '')}${t ? ' · 👨‍🏫 الأستاذ ' + esc(t.name) : ''} · ${esc(st.programName)}</div></div>
     <div class="p-body">
-      ${full ? '' : `<div class="card" style="text-align:center;padding:10px"><b style="color:var(--teal);font-size:16px">${V === 'exam' ? '📝 نتيجة الاختبار' : V === 'fee' ? '💰 بيان الرسوم' : V === 'absent' ? '📅 الحضور والغياب' : '📅 تقرير ' + lbl}</b></div>`}<div class="card no-print" style="padding:8px;${full ? '' : 'display:none'}"><div class="tabs" style="margin:0;justify-content:center">${[['day', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر'], ['all', 'الكل'], ['custom', 'من–إلى']].map(([k, tt]) => `<button data-k="${k}" class="${PV.k === k ? 'on' : ''}">${tt}</button>`).join('')}</div>
+      ${full || V === 'daily' || V === 'period' || V === 'absent' ? '' : `<div class="card" style="text-align:center;padding:10px"><b style="color:var(--teal);font-size:16px">${V === 'exam' ? '📝 نتيجة الاختبار' : V === 'fee' ? '💰 بيان الرسوم' : V === 'absent' ? '📅 الحضور والغياب' : '📅 تقرير ' + lbl}</b></div>`}<div class="card no-print" style="padding:8px;${full || V === 'daily' || V === 'period' || V === 'absent' ? '' : 'display:none'}"><div class="tabs" style="margin:0;justify-content:center">${[['day', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر'], ['all', 'الكل'], ['custom', 'من–إلى']].map(([k, tt]) => `<button data-k="${k}" class="${PV.k === k ? 'on' : ''}">${tt}</button>`).join('')}</div>
         ${PV.k === 'custom' ? `<div class="row" style="justify-content:center;margin-top:8px"><input type="date" class="inp" id="pf" value="${from}" style="width:auto"> إلى <input type="date" class="inp" id="pt" value="${to}" style="width:auto"></div>` : ''}</div>
-      <div class="grid g3" style="${full || per ? '' : 'display:none'}">
+      <div class="grid g3" style="${full || per || (V === 'daily' && from !== to) ? '' : 'display:none'}">
         ${f.quran && subj.includes('quran') && (full || PF('hifz') || PF('review')) ? `<div class="stat"><span class="i">📖</span><div class="n">${num(o.hifz)}</div><div class="l">وجه حفظ ${PVIEW ? 'في هذه الفترة' : lbl}</div></div><div class="stat"><span class="i">🔁</span><div class="n">${num(o.reviewAll)}</div><div class="l">وجه مراجعة ${PVIEW ? 'في هذه الفترة' : lbl}${o.far ? ` <small>(بعيدة ${num(o.far)})</small>` : ''}</div></div>` : ''}
         ${full || PF('att') ? `<div class="stat"><span class="i">📅</span><div class="n">${o.days ? o.attPct + '%' : '—'}</div><div class="l">الحضور (${o.p + o.l}/${o.days})${o.a ? ` · <b style="color:var(--red)">غياب ${o.a}</b>` : ''}</div></div>` : ''}
         ${rk && (full || PF('rank')) ? `<div class="stat"><span class="i">🏆</span><div class="n">${rk.rank}<small style="font-size:14px;color:var(--muted)"> / ${studentsOfClass(c.id).length}</small></div><div class="l">الترتيب في الفصل</div></div>` : ''}
