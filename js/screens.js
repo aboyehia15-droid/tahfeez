@@ -149,7 +149,8 @@ function studentForm(st) {
       <div class="field"><label>اتجاه الحفظ</label><select class="inp" name="direction"><option value="desc" ${st.direction !== 'asc' ? 'selected' : ''}>من الناس صعوداً (جزء عم أولاً)</option><option value="asc" ${st.direction === 'asc' ? 'selected' : ''}>من الفاتحة والبقرة نزولاً</option></select></div>
       ${features().fees ? `<div class="field"><label>الرسوم المقررة (${S.settings.currency})</label><input class="inp" type="number" name="fee" value="${st.fee != null && st.fee !== '' ? st.fee : (S.settings.feeDefault || '')}"></div>` : ''}
       <div class="field"><label>ملاحظات إدارية</label><input class="inp" name="adminNote" value="${esc(st.adminNote || '')}"></div>
-    </div>`;
+    </div>
+    <div class="field"><label>📱 أرقام إضافية لاستلام التقارير (رقم في كل سطر، ويمكن كتابة الاسم بعده)</label><textarea class="inp" name="reportPhones" rows="2" dir="ltr" placeholder="0551234567 الأم&#10;0559876543 الأخ الأكبر">${esc(st.reportPhones || '')}</textarea></div>`;
   const m = modal({ title: st.id ? 'تعديل بيانات الطالب' : 'إضافة طالب', body, wide: true, foot: `<button class="btn" data-save>💾 حفظ</button><button class="btn ghost" data-close2>إلغاء</button>` });
   $('[data-close2]', m.el).onclick = () => m.close();
   $('[data-save]', m.el).onclick = () => {
@@ -182,6 +183,8 @@ function studentMenu(st) {
     <button class="btn light" data-a="edit">✏️ تعديل البيانات</button>
     ${f.parentPage ? `<button class="btn light" data-a="page">👁️ صفحة الطالب</button><button class="btn wa" data-a="wa">💬 إرسال الرابط لولي الأمر</button><button class="btn light" data-a="copy">📋 نسخ رابط ولي الأمر</button>` : ''}
     <button class="btn light" data-a="report">📊 تقرير الطالب</button>
+    <button class="btn light" data-a="recs">🗂️ سجلات المتابعة (حذف/تنظيف)</button>
+    <button class="btn wa" data-a="msg">✉️ رسالة خاصة لولي الأمر</button>
     ${st.status !== 'active' ? '<button class="btn gold" data-a="activate">✔️ تفعيل</button>' : '<button class="btn ghost" data-a="archive">🗄️ أرشفة</button>'}
     ${f.fees && canAdmin() ? '<button class="btn light" data-a="fees">💰 الرسوم</button>' : ''}
     ${isAdmin() ? '<button class="btn red" data-a="del">🗑️ حذف نهائي</button>' : ''}
@@ -195,6 +198,8 @@ function studentMenu(st) {
     if (a === 'copy') copyText(parentLink(st));
     if (a === 'wa') { m.close(); waCompose('parent', [st]); }
     if (a === 'report') { m.close(); location.hash = '#/reports/student/' + st.id; }
+    if (a === 'recs') { m.close(); recordsManager([st]); }
+    if (a === 'msg') { m.close(); waCompose('custom', [st]); }
     if (a === 'activate') { m.close(); activateDialog([st]); }
     if (a === 'archive') { st.status = 'archived'; save('students', st); m.close(); render(); }
     if (a === 'fees') { m.close(); paymentDialog(st); }
@@ -252,7 +257,7 @@ function viewStudents(v, sub) {
     <div class="card" style="padding:10px"><div class="row"><div class="search grow"><input class="inp" id="q" placeholder="بحث بالاسم أو الجوال أو السجل"></div>
       <select class="inp" id="fcls" style="width:auto">${classOptions('', 'كل الفصول')}<option value="none">بدون فصل</option></select></div>
       <div class="row" style="margin-top:8px"><label class="row small"><input type="checkbox" id="selall"> تحديد الكل</label><span class="sp" style="flex:1"></span>
-      ${canAdmin() ? `${tab === 'pending' ? '<button class="btn sm gold" id="bulk-act">✔️ تفعيل المحدد</button>' : ''}<button class="btn sm light" id="bulk-cls">🏫 نقل لفصل</button>` : ''}<button class="btn sm wa" id="bulk-wa">💬 إرسال روابط المتابعة</button></div></div>
+      ${canAdmin() ? `${tab === 'pending' ? '<button class="btn sm gold" id="bulk-act">✔️ تفعيل المحدد</button>' : ''}<button class="btn sm light" id="bulk-cls">🏫 نقل لفصل</button>` : ''}<button class="btn sm wa" id="bulk-wa">💬 إرسال روابط المتابعة</button><button class="btn sm wa" id="bulk-msg">✉️ رسالة خاصة</button></div></div>
     <div class="card" style="padding:4px 6px" id="stu-list"></div>`;
   const draw = () => {
     const q = Q.norm($('#q').value); const fc = $('#fcls').value;
@@ -272,6 +277,7 @@ function viewStudents(v, sub) {
   const ba = $('#bulk-act'); if (ba) ba.onclick = () => { const s = selected(); if (!s.length) return toast('حدد طلاباً أولاً'); activateDialog(s); };
   const bc = $('#bulk-cls'); if (bc) bc.onclick = () => { const s = selected(); if (!s.length) return toast('حدد طلاباً أولاً'); const m = modal({ title: 'نقل ' + s.length + ' طالب إلى فصل', body: `<select class="inp" id="mv">${classOptions('')}</select>`, foot: '<button class="btn" data-ok>نقل</button>' }); $('[data-ok]', m.el).onclick = () => { s.forEach(x => { x.classId = $('#mv').value; save('students', x); }); m.close(); render(); }; };
   $('#bulk-wa').onclick = () => { let s = selected(); if (!s.length) s = T('students').filter(x => x.status === tab); waCompose('parent', s); };
+  $('#bulk-msg').onclick = () => { let s = selected(); if (!s.length) s = T('students').filter(x => x.status === tab && (!S.me || S.me.role !== 'teacher' || my.includes(x.classId))); waCompose('custom', s); };
   const ad = $('#add-stu'); if (ad) ad.onclick = () => studentForm();
   const im = $('#imp-stu'); if (im) im.onclick = importStudentsDialog;
   const ex = $('#exp-stu'); if (ex) ex.onclick = async () => { await loadXLSX(); const rows = T('students').map(s => { const o = {}; STU_FIELDS.forEach(f => o[f[1]] = s[f[0]] || ''); o['العمر'] = ageFrom(s.birthDate); o['الفصل'] = (classOf(s) || {}).name || ''; o['الحالة'] = { active: 'نشط', pending: 'بانتظار التفعيل', archived: 'مؤرشف' }[s.status] || ''; o['رابط ولي الأمر'] = s.parentToken ? parentLink(s) : ''; return o; }); const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.utils.book_append_sheet(wb, ws, 'بيانات الطلاب'); XLSX.writeFile(wb, 'بيانات الطلاب.xlsx'); };

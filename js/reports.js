@@ -16,7 +16,7 @@ function viewReports(v, sub, arg) {
   const studs = studentsOfClass(REP.cls);
   if ((REP.type === 'student' || REP.type === 'exam') && !studs.some(s => s.id === REP.stu)) REP.stu = (studs[0] || {}).id || '';
   const needCls = !['all', 'fees'].includes(REP.type) || REP.type === 'fees';
-  v.innerHTML = `<div class="page-head"><h2>📊 التقارير</h2><span class="sp"></span><button class="btn" id="rprint">🖨️ طباعة / PDF</button><button class="btn light" id="rxls">📤 Excel</button>${((REP.type === 'student' && REP.stu) || ((REP.type === 'exam' || REP.type === 'examclass') && REP.exam)) ? `<button class="btn wa" id="rwa">💬 ${REP.allStu || REP.type === 'examclass' ? 'إرسال لأولياء الأمور' : 'إرسال لولي الأمر'}</button>` : ''}</div>
+  v.innerHTML = `<div class="page-head"><h2>📊 التقارير</h2><span class="sp"></span><button class="btn" id="rprint">🖨️ طباعة / PDF</button><button class="btn light" id="rxls">📤 Excel</button>${!['fees', 'exam', 'examclass', 'all'].includes(REP.type) ? '<button class="btn light" id="rrecs" title="حذف أيام أو بنود من السجلات">🗂️ إدارة السجلات</button>' : ''}${((REP.type === 'student' && REP.stu) || ((REP.type === 'exam' || REP.type === 'examclass') && REP.exam)) ? `<button class="btn wa" id="rwa">💬 ${REP.allStu || REP.type === 'examclass' ? 'إرسال لأولياء الأمور' : 'إرسال لولي الأمر'}</button>` : ''}</div>
     <div class="card rep-controls no-print" style="padding:12px">
       <div class="grid g3">
         <div class="field"><label>نوع التقرير</label><select class="inp" id="rt">${types.filter(t => t[0] !== 'cur').map(([k, t]) => `<option value="${k}" ${REP.type === k ? 'selected' : ''}>${t}</option>`).join('')}<optgroup label="📚 المناهج">${curricula().map(c => `<option value="cur:${c.id}" ${REP.type === 'cur' && REP.cur === c.id ? 'selected' : ''}>${c.icon} تقرير ${esc(c.name)}</option>`).join('')}</optgroup></select></div>
@@ -63,6 +63,7 @@ function viewReports(v, sub, arg) {
   out.innerHTML = classes.length || REP.type === 'fees' || REP.type === 'all' ? R[REP.type]() : '<div class="card empty">لا توجد فصول بعد</div>';
   mobileTables(out);
   $('#rprint').onclick = () => printLandscape();
+  const rrc = $('#rrecs'); if (rrc) rrc.onclick = () => { const list = REP.type === 'student' && REP.stu && !REP.allStu ? [byId('students', REP.stu)] : REP.type === 'all' ? T('students').filter(x => x.status === 'active') : studentsOfClass(REP.cls); recordsManager(list, REP.period === 'all' ? '' : from, REP.period === 'all' ? '' : to, 'إدارة سجلات المتابعة'); };
   $('#rxls').onclick = () => exportTables(out, REP.type === 'cur' ? 'تقرير ' + ((curById(REP.cur) || {}).name || 'منهج') : REPORTS.find(r => r[0] === REP.type)[1].replace(/^\S+\s/, ''));
   const rw = $('#rwa'); if (rw) rw.onclick = () => { if (REP.type === 'exam' || REP.type === 'examclass') { const ex = byId('exams', REP.exam); if (!ex) return; const list = (REP.type === 'examclass' || REP.allStu ? studs : studs.filter(s => s.id === REP.stu)).filter(s => getRes(ex.id, s.id)); return waCompose('exam', list, { ex }); } const list = REP.allStu ? studs : [byId('students', REP.stu)]; waCompose('period', list, { from, to, label: periodLbl }); };
 }

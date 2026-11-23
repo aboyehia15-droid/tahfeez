@@ -6,6 +6,7 @@ const WA_KINDS = {
   absent: { title: '❌ إشعار الغياب', opts: [['date', 'تاريخ الغياب', 1], ['count', 'عدد أيام الغياب هذا الشهر', 0], ['ask', 'طلب الحرص على الحضور', 1], ['link', 'رابط صفحة الطالب', 0], ['sign', 'توقيع المجمع', 1]] },
   period: { title: '📊 تقرير الفترة', opts: [['hifz', 'الحفظ', 1], ['review', 'المراجعة', 1], ['surahs', 'السور التي حفظها', 0], ['noor', 'النورانية', 1], ['zad', 'زاد الطفل', 1], ['cur', 'المناهج (الحروف والأرقام…)', 1], ['grade', 'التقديرات', 1], ['att', 'الحضور والغياب', 1], ['notes', 'ملاحظات المعلم', 1], ['errors', 'الأخطاء والتصويب', 1], ['media', 'التسجيلات الصوتية والمرئية', 1], ['behavior', 'السلوك', 0], ['rank', 'الترتيب في الفصل', 1], ['level', 'المستوى العام', 1], ['exams', 'نتائج الاختبارات', 0], ['fees', 'المتبقي من الرسوم', 0], ['link', 'رابط صفحة الطالب', 1], ['sign', 'توقيع المجمع', 1]] },
   exam: { title: '📝 نتيجة الاختبار', opts: [['subjects', 'درجة كل مادة', 1], ['total', 'المجموع', 1], ['pct', 'النسبة', 0], ['grade', 'التقدير', 1], ['rank', 'الترتيب في الفصل', 0], ['notes', 'ملاحظة المعلم', 1], ['quran', 'ملخص أخطاء القرآن', 0], ['media', 'روابط تسجيلات الاختبار المختارة', 0], ['link', 'رابط صفحة الطالب (التفاصيل)', 1], ['sign', 'توقيع المجمع', 1]] },
+  custom: { title: '✉️ رسالة خاصة لولي الأمر', opts: [['hello', 'التحية واسم الطالب', 1], ['link', 'رابط صفحة الطالب', 0], ['sign', 'التوقيع', 1]] },
   fee: { title: '💰 تذكير الرسوم', opts: [['due', 'الرسوم المستحقة', 0], ['disc', 'الخصم أو الإعفاء', 0], ['paid', 'المسدد', 1], ['remaining', 'المتبقي', 1], ['pays', 'تفاصيل الدفعات', 0], ['link', 'رابط صفحة الطالب', 0], ['sign', 'توقيع المجمع', 1]] }
 };
 function waPrefs(kind) { const d = {}; WA_KINDS[kind].opts.forEach(([k, , v]) => d[k] = v); const sv = ((S.settings.waPrefs || {})[kind]) || {}; if (sv._v === 2) Object.assign(d, sv); delete d._v; return d; }
@@ -76,6 +77,12 @@ function waBuild(kind, s, ctx, o) {
     if (o.notes && r.notes) L.push('📝 ملاحظة المعلم: ' + r.notes);
     if (o.media) (r.media || []).filter(x => x.share).forEach(x => L.push((x.type === 'video' ? '🎥 ' : '🎙️ ') + (x.label || 'تسجيل') + ':\n' + x.url));
   }
+  if (kind === 'custom') {
+    if (o.hello) L.push(HELLO(s));
+    const c = classOf(s), t = c && teacherOf(c);
+    if (o.extra) L.push(o.extra.replace(/\{الطالب\}/g, s.name).replace(/\{ولي_الأمر\}/g, s.guardianName || 'ولي الأمر').replace(/\{الفصل\}/g, c ? c.name : '').replace(/\{المعلم\}/g, t ? t.name : ''));
+    o = Object.assign({}, o, { extra: '' });
+  }
   if (kind === 'fee') {
     const d = discountsOf(s), f = feeOf(s), p = paidOf(s);
     L.push(HELLO(s)); L.push('💰 بيان الرسوم الدراسية');
@@ -88,11 +95,24 @@ function waBuild(kind, s, ctx, o) {
   if (o.extra) L.push(o.extra);
   if (o.link && features().parentPage) {
     const sel = Object.keys(o).filter(k => o[k] && !['link', 'sign', 'greet', 'extra', 'class'].includes(k)).join(',');
-    const view = kind === 'parent' ? null : kind === 'daily' ? { v: 'daily', o: sel, f: ctx.date, t: ctx.date } : kind === 'absent' ? { v: 'absent', o: sel, f: monthRange(ctx.date)[0], t: monthRange(ctx.date)[1] } : kind === 'period' ? { v: 'period', o: sel, f: ctx.from, t: ctx.to } : kind === 'exam' ? { v: 'exam', o: sel, x: ctx.ex.id } : { v: 'fee', o: sel };
+    const view = kind === 'parent' || kind === 'custom' ? null : kind === 'daily' ? { v: 'daily', o: sel, f: ctx.date, t: ctx.date } : kind === 'absent' ? { v: 'absent', o: sel, f: monthRange(ctx.date)[0], t: monthRange(ctx.date)[1] } : kind === 'period' ? { v: 'period', o: sel, f: ctx.from, t: ctx.to } : kind === 'exam' ? { v: 'exam', o: sel, x: ctx.ex.id } : { v: 'fee', o: sel };
     L.push((kind === 'parent' ? '🔗 رابط صفحة ابنكم:\n' : '📄 التفاصيل:\n') + parentLink(ensureToken(s), view));
   }
   if (o.sign) L.push(`جزاكم الله خيراً\n${st.complexName}`);
   return L.filter(Boolean).join('\n');
+}
+
+/* أرقام الإرسال لكل طالب: جوال ولي الأمر، الجوال الآخر، الأرقام الإضافية */
+const toLatin = v => String(v || '').replace(/[٠-٩]/g, d => d.charCodeAt(0) - 1632).replace(/[۰-۹]/g, d => d.charCodeAt(0) - 1776);
+function extraPhones(s) { return String(s.reportPhones || '').split(/\n|،|,/).map(l => { l = toLatin(l).trim(); const m = l.match(/\+?\d[\d\s-]{7,}\d/); return m ? { phone: m[0].replace(/[\s-]/g, ''), label: l.replace(m[0], '').trim() } : null; }).filter(Boolean); }
+function waTo() { return Object.assign({ g: 1, p2: 0, x: 0 }, S.settings.waTo || {}); }
+function phonesOf(s, to, more) {
+  const L = [];
+  if (to.g && s.guardianPhone) L.push({ phone: s.guardianPhone, label: 'ولي الأمر' });
+  if (to.p2 && s.phone2) L.push({ phone: s.phone2, label: 'الجوال الآخر' });
+  if (to.x) extraPhones(s).forEach(x => L.push({ phone: x.phone, label: x.label || 'رقم إضافي' }));
+  (more || []).forEach(x => L.push(x));
+  const seen = new Set(); return L.filter(x => { const k = normPhone(x.phone); if (!k || k.length < 9 || seen.has(k)) return false; seen.add(k); return true; });
 }
 
 /* نافذة الإرسال بالاختيار */
@@ -100,11 +120,19 @@ function waCompose(kind, students, ctx = {}, title) {
   students = (students || []).filter(Boolean);
   if (!students.length) return toast('لا يوجد طلاب للإرسال');
   const K = WA_KINDS[kind]; const o = waPrefs(kind); o.extra = '';
-  let sel = students.filter(s => s.guardianPhone).map(s => s.id);
+  const to = waTo(); let more = [];
+  const hasPh = s => phonesOf(s, to, more).length > 0;
+  let sel = students.filter(hasPh).map(s => s.id);
   const m = modal({ title: (title || K.title) + (students.length === 1 ? ' — ' + esc(students[0].name) : ''), wide: true, body: `
     <div class="grid g2">
       <div><div class="sec"><div class="sec-h">☑️ ماذا يُرسل؟</div><div class="row">${K.opts.filter(([k]) => k !== 'disc' || S.settings.parentShowDisc).map(([k, t]) => `<label class="chip" style="padding:6px 11px"><input type="checkbox" data-o="${k}" ${o[k] ? 'checked' : ''}> ${t}</label>`).join('')}</div>
-        <div class="field" style="margin-top:8px"><label>نص إضافي (اختياري)</label><textarea class="inp" id="wx" rows="2" placeholder="مثال: نذكركم بموعد الحفل يوم الخميس…"></textarea></div></div>
+        ${kind === 'custom' ? `<div class="field" style="margin-top:8px"><label>✍️ نص الرسالة</label><textarea class="inp" id="wx" rows="5" placeholder="اكتب رسالتك لولي الأمر…"></textarea><div class="small muted" style="margin-top:4px">يمكنك استخدام: <code>{الطالب}</code> <code>{ولي_الأمر}</code> <code>{الفصل}</code> <code>{المعلم}</code> فتُستبدل تلقائياً لكل طالب</div></div>` : `<div class="field" style="margin-top:8px"><label>نص إضافي (اختياري)</label><textarea class="inp" id="wx" rows="2" placeholder="مثال: نذكركم بموعد الحفل يوم الخميس…"></textarea></div>`}</div>
+        <div class="sec"><div class="sec-h">📱 أرقام الإرسال</div><div class="row">
+          <label class="chip" style="padding:6px 11px"><input type="checkbox" data-to="g" ${to.g ? 'checked' : ''}> جوال ولي الأمر</label>
+          <label class="chip" style="padding:6px 11px"><input type="checkbox" data-to="p2" ${to.p2 ? 'checked' : ''}> الجوال الآخر</label>
+          <label class="chip" style="padding:6px 11px"><input type="checkbox" data-to="x" ${to.x ? 'checked' : ''}> الأرقام الإضافية للطالب</label></div>
+          <div class="field" style="margin-top:8px"><label>➕ أرقام أخرى لهذه الرسالة (مثل المشرف أو الأم) — رقم في كل سطر</label><textarea class="inp" id="wmore" rows="2" dir="ltr" placeholder="05xxxxxxxx"></textarea></div>
+          <div class="small muted" id="wphones"></div></div>
         ${students.length > 1 ? `<div class="sec"><div class="sec-h">👥 إلى من؟ <span class="sp"></span><span class="chip" id="wcount"></span></div><div id="wto"></div>${students.some(s => !s.guardianPhone) ? `<div class="small" style="color:var(--red);margin-top:6px">⚠️ بدون رقم جوال: ${students.filter(s => !s.guardianPhone).map(s => esc(s.name)).join('، ')}</div>` : ''}</div>` : ''}</div>
       <div class="sec"><div class="sec-h">👁️ معاينة الرسالة<span class="sp"></span>${students.length > 1 ? '<select class="inp" id="wprev" style="width:auto;max-width:60%;font-size:15px"></select>' : ''}</div><div id="wpv" style="white-space:pre-wrap;background:#e7fbe0;border-radius:14px 14px 4px 14px;padding:12px;font-size:16px;line-height:1.8;max-height:50vh;overflow:auto;box-shadow:0 1px 2px rgba(0,0,0,.1)"></div></div>
     </div>`, foot: `<button class="btn wa" data-go>📤 متابعة للإرسال</button><label class="row small" style="align-self:center"><input type="checkbox" id="wsave" checked> حفظ اختياري للمرة القادمة</label>` });
@@ -112,22 +140,26 @@ function waCompose(kind, students, ctx = {}, title) {
   const draw = () => {
     const pv = $('#wprev', m.el); const cur = pv ? byId('students', pv.value) || students[0] : students[0];
     $('#wpv', m.el).textContent = waBuild(kind, cur, ctx, o);
-    const c = $('#wcount', m.el); if (c) c.textContent = sel.length + ' ولي أمر';
-    $('[data-go]', m.el).textContent = goLbl + ' (' + sel.length + ')';
+    const nMsgs = students.filter(s => sel.includes(s.id)).reduce((n, s) => n + phonesOf(s, to, more).length, 0);
+    const c = $('#wcount', m.el); if (c) c.textContent = sel.length + ' طالب';
+    const wp = $('#wphones', m.el); if (wp) wp.textContent = students.length === 1 ? (phonesOf(students[0], to, more).map(x => x.label + ': ' + x.phone).join(' · ') || '⚠️ لا يوجد رقم — اختر رقماً أو أضف رقماً') : `عدد الرسائل: ${nMsgs}`;
+    $('[data-go]', m.el).textContent = goLbl + ' (' + nMsgs + ')';
   };
   if (students.length > 1) {
-    $('#wto', m.el).appendChild(multiDrop([{ name: '', items: students.filter(s => s.guardianPhone).map(s => ({ key: s.id, t: s.name })) }], sel, 'المستلمون', k => { sel = k; const pv = $('#wprev', m.el); if (pv) { const keep = pv.value; pv.innerHTML = sel.map(id => `<option value="${id}">${esc(byId('students', id).name)}</option>`).join(''); if (sel.includes(keep)) pv.value = keep; } draw(); }));
+    $('#wto', m.el).appendChild(multiDrop([{ name: '', items: students.filter(s => s.guardianPhone || s.phone2 || s.reportPhones).map(s => ({ key: s.id, t: s.name })) }], sel, 'المستلمون', k => { sel = k; const pv = $('#wprev', m.el); if (pv) { const keep = pv.value; pv.innerHTML = sel.map(id => `<option value="${id}">${esc(byId('students', id).name)}</option>`).join(''); if (sel.includes(keep)) pv.value = keep; } draw(); }));
     $('#wprev', m.el).onchange = draw;
   }
-  m.body.addEventListener('change', e => { if (e.target.dataset.o) { o[e.target.dataset.o] = e.target.checked ? 1 : 0; draw(); } });
+  m.body.addEventListener('change', e => { if (e.target.dataset.o) { o[e.target.dataset.o] = e.target.checked ? 1 : 0; draw(); } if (e.target.dataset.to) { to[e.target.dataset.to] = e.target.checked ? 1 : 0; sel = students.filter(s => sel.includes(s.id) || hasPh(s)).filter(hasPh).map(s => s.id); draw(); } });
+  $('#wmore', m.el).oninput = e => { more = String(e.target.value).split(/\n|،|,/).map(l => toLatin(l).replace(/[^\d+]/g, '')).filter(x => x.length >= 9).map(p => ({ phone: p, label: 'رقم إضافي' })); if (more.length) sel = students.map(s => s.id).filter(id => sel.includes(id) || students.length === 1); draw(); };
   $('#wx', m.el).oninput = e => { o.extra = e.target.value.trim(); draw(); };
   draw();
   $('[data-go]', m.el).onclick = () => {
-    const list = students.length > 1 ? students.filter(s => sel.includes(s.id)) : students.filter(s => s.guardianPhone);
-    if (!list.length) return toast(students.length === 1 ? 'لا يوجد رقم جوال لولي الأمر' : 'اختر المستلمين');
-    if ($('#wsave', m.el).checked) { const p = Object.assign({}, S.settings.waPrefs || {}); const c = Object.assign({}, o); delete c.extra; c._v = 2; p[kind] = c; if (!viewingArchive()) saveSettings({ waPrefs: p }); }
+    if (kind === 'custom' && !o.extra) return toast('اكتب نص الرسالة أولاً');
+    const list = (students.length > 1 ? students.filter(s => sel.includes(s.id)) : students).filter(s => phonesOf(s, to, more).length);
+    if (!list.length) return toast(students.length === 1 ? 'لا يوجد رقم — اختر «أرقام الإرسال» أو أضف رقماً' : 'اختر المستلمين');
+    if ($('#wsave', m.el).checked) { const p = Object.assign({}, S.settings.waPrefs || {}); const c = Object.assign({}, o); delete c.extra; c._v = 2; p[kind] = c; if (!viewingArchive()) saveSettings({ waPrefs: p, waTo: { g: to.g, p2: to.p2, x: to.x } }); }
     m.close();
-    const items = list.map(s => ({ name: s.name, phone: s.guardianPhone, studentId: s.id, classId: s.classId, text: waBuild(kind, s, ctx, o), onSent: () => { if (kind === 'parent') { s.linkSentAt = Date.now(); save('students', s); } } }));
+    const items = list.flatMap(s => { const text = waBuild(kind, s, ctx, o); return phonesOf(s, to, more).map(ph => ({ name: s.name + (ph.label && ph.label !== 'ولي الأمر' ? ' (' + ph.label + ')' : ''), phone: ph.phone, studentId: s.id, classId: s.classId, text, onSent: () => { if (kind === 'parent') { s.linkSentAt = Date.now(); save('students', s); } } })); });
     const go = () => { if (waModeNow() === 'center') return queueOutbox(items, title || K.title, kind); if (items.length === 1) { window.open(waLink(items[0].phone, items[0].text), '_blank'); items[0].onSent(); } else waQueueDialog(items, title || K.title); };
     if (S.settings.shortLinks && !isLocal() && o.link) {
       const urls = [...new Set(items.flatMap(it => it.text.match(/https?:\/\/\S*\?p=\S+/g) || []))];
