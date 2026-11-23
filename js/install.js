@@ -15,7 +15,7 @@ function parentManifest() {
   const base = location.origin + location.pathname.replace(/index\.html$/, '');
   const name = (document.title || '').replace(/^متابعة الطالب:\s*/, '') || 'متابعة ابني';
   const man = { name: 'متابعة ' + name, short_name: name.split(' ')[0] || 'متابعة', start_url: base + 'index.html?p=' + p + (IQ.get('s') ? '&s=' + encodeURIComponent(IQ.get('s')) : ''), scope: base, display: 'standalone', dir: 'rtl', lang: 'ar', background_color: '#f7f4ec', theme_color: '#0f5c55',
-    icons: [{ src: base + 'assets/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: base + 'assets/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }] };
+    icons: [{ src: base + 'assets/icon-192.png?v=2', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: base + 'assets/icon-512.png?v=2', sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: base + 'assets/icon-maskable-512.png?v=2', sizes: '512x512', type: 'image/png', purpose: 'maskable' }] };
   const l = document.querySelector('link[rel=manifest]'); if (l) l.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(man));
 }
 
@@ -43,7 +43,7 @@ function showInstallBar(force) {
   if (document.getElementById('inst-bar')) return;
   const parent = !!IQ.get('p');
   const bar = document.createElement('div'); bar.id = 'inst-bar'; bar.className = 'inst-bar no-print';
-  bar.innerHTML = `<img src="assets/icon-192.png" alt=""><div class="t"><b>${parent ? 'ثبّت صفحة ابنك على جوالك' : 'ثبّت التطبيق على جهازك'}</b><span>${parent ? 'تفتحها بلمسة واحدة دون البحث عن الرابط' : 'يفتح أسرع بلمسة واحدة ويعمل بدون إنترنت'}</span></div><button class="btn sm" data-inst>📲 تثبيت</button><button class="x" data-later title="لاحقاً">✕</button>`;
+  bar.innerHTML = `<img src="assets/icon-192.png?v=2" alt=""><div class="t"><b>${parent ? 'ثبّت صفحة ابنك على جوالك' : 'ثبّت التطبيق على جهازك'}</b><span>${parent ? 'تفتحها بلمسة واحدة دون البحث عن الرابط' : 'يفتح أسرع بلمسة واحدة ويعمل بدون إنترنت'}</span></div><button class="btn sm" data-inst>📲 تثبيت</button><button class="x" data-later title="لاحقاً">✕</button>`;
   document.body.appendChild(bar);
   bar.querySelector('[data-inst]').onclick = installNow;
   bar.querySelector('[data-later]').onclick = () => { localStorage.setItem('tz_inst_later', Date.now() + 3 * 864e5); hideInstallBar(); };
