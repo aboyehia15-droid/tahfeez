@@ -19,7 +19,7 @@ function shell(active) {
   const st = S.settings; const nav = NAV();
   const bottom = ['home', 'daily', 'reports', 'leaders', 'students'].map(k => nav.find(n => n.k === k)).filter(Boolean);
   return `<div class="layout">
-    <aside class="side"><div class="brand"><img src="${logoL()}" alt=""><div><b>${esc(st.complexName)}</b><small>منصة متابعة الحلقات</small></div></div>
+    <aside class="side"><div class="brand"><img src="${logoL()}" alt=""><div><b>${esc(st.complexName)}</b><small>منصة متابعة الحلقات الصباحية</small></div></div>
       <nav class="nav">${nav.map(n => `<a href="#/${n.k}" class="${active === n.k ? 'on' : ''}"><span class="ic">${n.ic}</span>${n.t}${n.badge ? `<span class="badge">${n.badge}</span>` : ''}</a>`).join('')}${installNavItem()}
       <a href="#" id="logout-lnk" style="margin-top:20px;opacity:.8"><span class="ic">🚪</span>${isLocal() ? 'وضع محلي' : 'تسجيل الخروج'}</a></nav></aside>
     <div class="main">
@@ -408,7 +408,7 @@ function viewClasses(v, sub) {
       try {
         const link = await directLink(u);
         if (kc) return copyText(link);
-        const msg = 'السلام عليكم أستاذ ' + u.name + '\nهذا رابط دخولك المباشر إلى منصة متابعة الحلقات (خاص بك فلا تشاركه):\n' + link + '\n\nاضغطه مرة واحدة فتدخل مباشرة، ثم اختر «📲 تثبيت التطبيق» ليبقى على شاشة جوالك.';
+        const msg = 'السلام عليكم أستاذ ' + u.name + '\nهذا رابط دخولك المباشر إلى منصة متابعة الحلقات الصباحية (خاص بك فلا تشاركه):\n' + link + '\n\nاضغطه مرة واحدة فتدخل مباشرة، ثم اختر «📲 تثبيت التطبيق» ليبقى على شاشة جوالك.';
         if (win) win.location.href = waLink(u.phone, msg); else window.open(waLink(u.phone, msg), '_blank');
       } catch (er) { if (win) win.close(); toast('⚠️ ' + er.message); }
     };
@@ -761,7 +761,7 @@ function serverSettings(box) {
   };
 }
 function viewLogin(root) {
-  root.innerHTML = `<div class="login"><div class="box"><div class="lg"><img src="${logoR()}"><img src="${logoL()}"></div><h2 style="color:var(--teal);margin:6px 0">منصة متابعة الحلقات</h2><p class="muted small">${esc(S.settings.complexName)}</p>
+  root.innerHTML = `<div class="login"><div class="box"><div class="lg"><img src="${logoR()}"><img src="${logoL()}"></div><h2 style="color:var(--teal);margin:6px 0">منصة متابعة الحلقات الصباحية</h2><p class="muted small">${esc(S.settings.complexName)}</p>
     <input class="inp" id="lu" placeholder="اسم المستخدم (رقم جوالك)" dir="ltr" autocapitalize="off" autocorrect="off" autocomplete="username" inputmode="text" style="margin-bottom:8px"><div style="position:relative;margin-bottom:12px"><input class="inp" id="lp" type="password" placeholder="كلمة المرور" dir="ltr" style="padding-left:44px" autocapitalize="off" autocorrect="off" autocomplete="current-password"><button type="button" id="lpe" title="إظهار كلمة المرور" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:20px;cursor:pointer">👁️</button></div><div id="lerr" hidden style="color:var(--red);font-size:15px;margin:-4px 0 10px;text-align:center"></div><button class="btn block" id="lb">دخول</button>
     ${isStandalone() ? '' : '<button class="btn light block" style="margin-top:8px" onclick="installNow()">📲 تثبيت التطبيق على جهازك</button>'}
     ${URLQ.get('local') ? '<button class="btn ghost block" id="lx" style="margin-top:8px;font-size:14px">العمل محلياً بدون خادم</button>' : ''}</div></div>`;
