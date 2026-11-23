@@ -305,12 +305,13 @@ function route_(r) {
   }
 
   if (a === 'makeKey') { // إنشاء/تجديد رابط الدخول المباشر لمستخدم (للمدير والمشرف)
-    if (me.role !== 'admin' && me.role !== 'supervisor') return { ok: false, error: 'للإدارة فقط' };
+    if (me.role !== 'admin' && me.role !== 'supervisor' && r.id !== me.id) return { ok: false, error: 'للإدارة فقط' }; // كل مستخدم يستطيع أخذ رابط دخوله هو
     var lock = LockService.getScriptLock(); lock.waitLock(20000);
     try {
       var all = readAll_('users'); var tu = all.filter(function (x) { return x.id === r.id; })[0];
       if (!tu) return { ok: false, error: 'المستخدم غير موجود' };
       if (tu.role === 'admin' && me.role !== 'admin') return { ok: false, error: 'للمدير فقط' };
+      if (r.id === me.id && me.role !== 'admin' && me.role !== 'supervisor') r.renew = false; // المعلم لا يجدد رابطه بنفسه
       if (!tu.loginKey || r.renew) { tu.loginKey = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '').slice(0, 32); tu.updatedAt = Date.now(); upsert_('users', [tu]); }
       return { ok: true, key: tu.loginKey };
     } finally { lock.releaseLock(); }
