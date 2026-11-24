@@ -1,5 +1,5 @@
 /* ===== النواة: البيانات والتخزين والاتصال بالخادم وأدوات عامة ===== */
-const TABLE_NAMES = ['students', 'classes', 'users', 'records', 'payments', 'invites', 'exams', 'results', 'settings', 'outbox'];
+const TABLE_NAMES = ['students', 'classes', 'users', 'records', 'payments', 'invites', 'exams', 'results', 'settings', 'outbox', 'receipts'];
 const LS = { data: 'tz_data', sess: 'tz_session', server: 'tz_server', queue: 'tz_queue' };
 
 const DEFAULT_SETTINGS = {
@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS = {
   parentShowFees: true,
   feeDefault: 0,
   currency: 'ريال',
+  bankName: 'مصرف الراجحي', bankHolder: 'جمعية تعلم', bankAccount: '166000010006080500064', bankIban: 'SA6380000166608010500064',
+  payNote: 'سداد لصالح حلقات مجمع ابن تيمية', payWhats: '0505890287', receiptOn: true, receiptAuto: false,
   regClosed: false,
   regNote: 'نسعد بتسجيل ابنكم في حلقات تحفيظ القرآن الكريم، يرجى تعبئة البيانات بدقة.',
   waInvite: 'السلام عليكم ورحمة الله وبركاته\nولي أمر الطالب الكريم،\nيسر {complex} دعوتكم لتسجيل ابنكم في {program}.\nرابط التسجيل:\n{link}\nجزاكم الله خيراً.',

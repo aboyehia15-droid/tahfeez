@@ -23,7 +23,8 @@ var TABLES = {
   exams:    ['id', 'title', 'kind', 'date', 'updatedAt', 'json'],
   results:  ['id', 'examId', 'studentId', 'classId', 'date', 'updatedAt', 'json'],
   settings: ['id', 'updatedAt', 'json'],
-  outbox:   ['id', 'by', 'studentId', 'status', 'createdAt', 'updatedAt', 'json'] // رسائل المعلمين المحوّلة للإدارة لترسلها من واتسابها
+  outbox:   ['id', 'by', 'studentId', 'status', 'createdAt', 'updatedAt', 'json'], // رسائل المعلمين المحوّلة للإدارة لترسلها من واتسابها
+  receipts: ['id', 'studentId', 'status', 'amount', 'ref', 'createdAt', 'updatedAt', 'json'] // إيصالات السداد التي يرفعها أولياء الأمور
 };
 var SECRET_FIELDS = ['passHash', 'loginKey'];
 
@@ -40,7 +41,7 @@ function subFolder_(name) {
   var props = PropertiesService.getScriptProperties(); var key = 'FOLDER_' + name;
   var id = props.getProperty(key);
   if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
-  var f = DriveApp.createFolder({ media: 'تسجيلات التسميع والاختبارات', sheets: 'أوراق إجابات الاختبارات' }[name] || name);
+  var f = DriveApp.createFolder({ media: 'تسجيلات التسميع والاختبارات', sheets: 'أوراق إجابات الاختبارات', 'receipts-in': 'إيصالات السداد الواردة من أولياء الأمور' }[name] || name);
   props.setProperty(key, f.getId()); return f;
 }
 
@@ -201,6 +202,8 @@ function route_(r) {
     return { ok: true, token: tk2, user: stripSecrets_([uk])[0] };
   }
 
+  if (a === 'parentReceiptRead' || a === 'parentReceiptSubmit') return parentReceipt_(a, r);
+
   if (a === 'regInfo') {
     var st = settings_();
     return { ok: true, settings: publicSettings_(st), classes: readAll_('classes').map(function (c) { return { id: c.id, name: c.name, track: c.track }; }) };
@@ -237,12 +240,13 @@ function route_(r) {
     var st3 = settings_();
     var pays = st3.parentShowFees === false ? [] : readAll_('payments').filter(function (p) { return p.studentId === stu.id; });
     var safe = {}; for (var k in stu) if (['idNumber', 'guardianId', 'parentToken', '_row'].indexOf(k) < 0) safe[k] = stu[k];
+    var myRcp = readAll_('receipts').filter(function (x) { return (x.alloc || []).some(function (q) { return q.studentId === stu.id; }); }).map(function (x) { return { id: x.id, date: x.date, amount: x.amount, status: x.status, reason: x.reason || '', payer: x.payer || '', createdAt: x.createdAt, mine: ((x.alloc || []).filter(function (q) { return q.studentId === stu.id; })[0] || {}).amount }; });
     var myRes = st3.parentShowExams === false ? [] : readAll_('results').filter(function (x) { return x.studentId === stu.id && x.published !== false; });
     var exIds = myRes.map(function (x) { return x.examId; });
     var myExams = readAll_('exams').filter(function (e) { return exIds.indexOf(e.id) >= 0; }).map(function (e) {
       return { id: e.id, title: e.title, kind: e.kind, date: e.date, total: e.total, subjects: (e.subjects || []).map(function (s) { return { id: s.id, book: s.book, name: s.name, icon: s.icon, total: s.total, questions: (s.questions || []).map(function (q) { return { id: q.id, mark: q.mark }; }) }; }) };
     });
-    return { ok: true, student: safe, cls: cls, teacher: teacher ? { name: teacher.name, phone: teacher.phone } : null, results: myRes, exams: myExams,
+    return { ok: true, student: safe, cls: cls, teacher: teacher ? { name: teacher.name, phone: teacher.phone } : null, receipts: myRcp, results: myRes, exams: myExams,
       records: recs, payments: pays, mates: mates, mateRecords: mateRecs, settings: publicSettings_(st3) };
   }
 
@@ -260,6 +264,7 @@ function route_(r) {
       data.results = data.results.filter(function (x) { return my.indexOf(x.classId) >= 0; });
       data.exams = data.exams.filter(function (e) { return (e.classIds || []).some(function (c) { return my.indexOf(c) >= 0; }); });
       data.outbox = data.outbox.filter(function (x) { return x.by === me.id; });
+      data.receipts = [];
       data.payments = []; data.invites = [];
       data.users = data.users.map(function (u) { return { id: u.id, name: u.name, role: u.role }; });
       data.settings = data.settings.map(function (x) { var c = {}; for (var k in x) if (k !== 'waToken' && k !== 'waInstance') c[k] = x[k]; return c; });
@@ -313,6 +318,12 @@ function route_(r) {
     var file = (r.folder ? subFolder_(r.folder) : receiptsFolder_()).createFile(blob);
     try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
     return { ok: true, url: 'https://drive.google.com/file/d/' + file.getId() + '/view', id: file.getId() };
+  }
+
+  if (a === 'receiptFile') { // عرض صورة الإيصال الخاصة للإدارة فقط
+    if (me.role !== 'admin' && me.role !== 'supervisor') return { ok: false, error: 'للإدارة فقط' };
+    try { var bf = DriveApp.getFileById(r.fileId).getBlob(); return { ok: true, mime: bf.getContentType(), data: Utilities.base64Encode(bf.getBytes()) }; }
+    catch (e) { return { ok: false, error: 'تعذر فتح الإيصال' }; }
   }
 
   if (a === 'makeKey') { // إنشاء/تجديد رابط الدخول المباشر لمستخدم (للمدير والمشرف)
@@ -402,8 +413,83 @@ function route_(r) {
 
 function publicSettings_(s) {
   var keys = ['orgName', 'branchName', 'complexName', 'programName', 'supervisor', 'logoRight', 'logoLeft', 'regClosed', 'regNote',
-    'gradeLabels', 'workDays', 'year', 'years', 'zad', 'features', 'parentShowFees', 'parentShowDisc', 'parentShowRank', 'parentShowExams', 'parentShowMedia', 'examScale', 'examReportShow', 'curricula', 'feeDefault', 'currency', 'phone', 'regFields'];
+    'gradeLabels', 'workDays', 'year', 'years', 'zad', 'features', 'parentShowFees', 'parentShowDisc', 'parentShowRank', 'parentShowExams', 'parentShowMedia', 'examScale', 'examReportShow', 'curricula', 'feeDefault', 'currency', 'phone', 'regFields', 'bankName', 'bankAccount', 'bankIban', 'bankHolder', 'payNote', 'payWhats', 'receiptOn'];
   var o = {}; keys.forEach(function (k) { if (s[k] !== undefined) o[k] = s[k]; });
   return o;
+}
+
+/* ===================== 📥 إيصالات السداد من أولياء الأمور ===================== */
+var BANK_DEFAULT = { bankName: 'مصرف الراجحي', bankHolder: 'جمعية تعلم', bankAccount: '166000010006080500064', bankIban: 'SA6380000166608010500064' };
+function digits_(v) { return String(v == null ? '' : v).replace(/[٠-٩]/g, function (d) { return d.charCodeAt(0) - 1632; }).replace(/[۰-۹]/g, function (d) { return d.charCodeAt(0) - 1776; }).replace(/\D/g, ''); }
+function claude_(content, maxTokens) {
+  var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY'); if (!key) return null;
+  var st = settings_();
+  var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    payload: JSON.stringify({ model: st.aiModel || 'claude-sonnet-5-5', max_tokens: maxTokens || 1500, messages: [{ role: 'user', content: content }] }) });
+  if (resp.getResponseCode() !== 200) return null;
+  var j = JSON.parse(resp.getContentText()); return (j.content || []).map(function (c) { return c.text || ''; }).join('');
+}
+function siblingsOf_(stu, all) {
+  var ph = digits_(stu.guardianPhone).slice(-9), gid = digits_(stu.guardianId);
+  return all.filter(function (x) { return x.id !== stu.id && x.status === 'active' && ((ph && digits_(x.guardianPhone).slice(-9) === ph) || (gid && gid.length > 5 && digits_(x.guardianId) === gid)); });
+}
+function receiptChecks_(f, hash, ignoreId) {
+  var st = settings_(); var W = [];
+  var exp = digits_(st.bankIban || BANK_DEFAULT.bankIban).slice(-4), exp2 = digits_(st.bankAccount || BANK_DEFAULT.bankAccount).slice(-4);
+  var to = digits_(f.toAccount).slice(-4);
+  if (!to) W.push('لم يظهر في الإيصال رقم حساب المستفيد — تأكد أنه حساب الجمعية');
+  else if (to !== exp && to !== exp2) W.push('حساب المستفيد في الإيصال (…' + to + ') ليس حساب الجمعية (…' + exp + ')');
+  var rcps = readAll_('receipts').filter(function (x) { return x.id !== ignoreId && x.status !== 'rejected'; });
+  var ref = digits_(f.ref) || String(f.ref || '').trim();
+  if (ref && ref.length >= 4) {
+    if (rcps.some(function (x) { return (digits_(x.ref) || String(x.ref || '').trim()) === ref; }) || readAll_('payments').some(function (p) { return p.ref && (digits_(p.ref) || p.ref) === ref; })) W.push('رقم العملية ' + f.ref + ' مستخدم في إيصال سابق');
+  } else W.push('لم يظهر رقم العملية في الإيصال');
+  if (hash && rcps.some(function (x) { return x.hash === hash; })) W.push('هذه الصورة نفسها رُفعت من قبل');
+  if (!(+f.amount > 0)) W.push('لم يُحدَّد المبلغ');
+  if (f.date) { var d = new Date(f.date + 'T12:00:00'); var days = (Date.now() - d.getTime()) / 864e5; if (days > 90) W.push('تاريخ التحويل قديم (أكثر من 3 أشهر)'); if (days < -1) W.push('تاريخ التحويل في المستقبل'); }
+  else W.push('لم يظهر تاريخ التحويل');
+  return W;
+}
+function parentReceipt_(a, r) {
+  var stu = readAll_('students').filter(function (x) { return x.parentToken && x.parentToken === r.t; })[0];
+  if (!stu) return { ok: false, error: 'الرابط غير صالح' };
+  var all = readAll_('students');
+  if (a === 'parentReceiptRead') {
+    if (!r.data || String(r.data).length > 12e6) return { ok: false, error: 'الملف كبير جداً — صوّر الإيصال فقط أو ارفع لقطة شاشة' };
+    var bytes = Utilities.base64Decode(r.data);
+    var hash = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, bytes).map(function (x) { return ('0' + (x & 255).toString(16)).slice(-2); }).join('');
+    var file = subFolder_('receipts-in').createFile(Utilities.newBlob(bytes, r.mime || 'image/jpeg', stu.name + ' — ' + (r.name || 'إيصال'))); // خاص: لا يُشارك برابط
+    var f = {};
+    var isPdf = /pdf/.test(r.mime || '');
+    var txt = claude_([isPdf ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: r.data } } : { type: 'image', source: { type: 'base64', media_type: r.mime || 'image/jpeg', data: r.data } },
+      { type: 'text', text: 'هذا إيصال تحويل بنكي أو سداد. استخرج منه البيانات وأجب بـ JSON فقط دون شرح:\n{"isReceipt":true,"amount":0,"currency":"SAR","date":"YYYY-MM-DD","time":"HH:MM","payer":"اسم المحوِّل","fromBank":"بنك المحوِّل","fromAccountLast4":"","toName":"اسم المستفيد","toAccount":"رقم حساب أو آيبان المستفيد كما يظهر","ref":"رقم العملية أو المرجع","note":"الملاحظة أو الغرض إن وُجد"}\nاكتب الأرقام بالأرقام الإنجليزية. ما لا يظهر اتركه فارغاً.' }], 1200);
+    if (txt) { try { f = JSON.parse((txt.match(/\{[\s\S]*\}/) || ['{}'])[0]); } catch (e) { f = {}; } }
+    f.amount = +digits_(String(f.amount || '').split('.')[0]) ? +String(f.amount).replace(/[^\d.]/g, '') : '';
+    var sibs = siblingsOf_(stu, all).map(function (x) { return { id: x.id, name: x.name }; });
+    return { ok: true, fileId: file.getId(), hash: hash, fields: f, ai: !!txt, siblings: sibs, warnings: txt ? receiptChecks_(f, hash) : [] };
+  }
+  // parentReceiptSubmit
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var fs = r.fields || {}; var sibIds = siblingsOf_(stu, all).map(function (x) { return x.id; }).concat([stu.id]);
+    var alloc = (r.alloc && r.alloc.length ? r.alloc : [{ studentId: stu.id, amount: +fs.amount }]).filter(function (q) { return sibIds.indexOf(q.studentId) >= 0 && +q.amount > 0; })
+      .map(function (q) { var sx = all.filter(function (x) { return x.id === q.studentId; })[0]; return { studentId: q.studentId, name: sx ? sx.name : '', classId: sx ? sx.classId : '', amount: +q.amount }; });
+    if (!alloc.length) return { ok: false, error: 'حدد المبلغ' };
+    var total = alloc.reduce(function (n, q) { return n + q.amount; }, 0);
+    var f2 = { amount: +fs.amount || total, date: String(fs.date || '').slice(0, 10), payer: String(fs.payer || '').slice(0, 80), relation: String(fs.relation || '').slice(0, 40), fromBank: String(fs.fromBank || '').slice(0, 60), ref: String(fs.ref || '').slice(0, 60), toAccount: String(fs.toAccount || '').slice(0, 40), note: String(fs.note || '').slice(0, 200) };
+    var W = receiptChecks_(f2, r.hash);
+    if (Math.abs(total - f2.amount) > 0.5) W.push('مجموع التوزيع على الأبناء (' + total + ') لا يساوي مبلغ الإيصال (' + f2.amount + ')');
+    var rc = { id: 'rc' + Utilities.getUuid().replace(/-/g, '').slice(0, 12), studentId: stu.id, classId: stu.classId, studentName: stu.name, guardianName: stu.guardianName || '', guardianPhone: stu.guardianPhone || '',
+      amount: f2.amount, date: f2.date, payer: f2.payer, relation: f2.relation, fromBank: f2.fromBank, ref: f2.ref, toLast4: digits_(f2.toAccount).slice(-4), note: f2.note,
+      alloc: alloc, fileId: String(r.fileId || ''), hash: String(r.hash || ''), warnings: W, aiRead: !!r.ai, status: 'pending', createdAt: Date.now(), updatedAt: Date.now() };
+    var st = settings_();
+    if (st.receiptAuto && !W.length) { // اعتماد تلقائي للإيصال السليم
+      var pays = alloc.map(function (q) { return { id: 'p' + Utilities.getUuid().replace(/-/g, '').slice(0, 12), studentId: q.studentId, amount: q.amount, date: f2.date || new Date().toISOString().slice(0, 10), method: 'تحويل بنكي', note: 'إيصال ولي الأمر' + (f2.ref ? ' — عملية ' + f2.ref : ''), ref: f2.ref, payer: f2.payer, relation: f2.relation, fromBank: f2.fromBank, receiptId: rc.id, receiptFileId: rc.fileId, approvedBy: 'تلقائي', updatedAt: Date.now() }; });
+      upsert_('payments', pays); rc.status = 'approved'; rc.approvedBy = 'تلقائي'; rc.approvedAt = Date.now(); rc.paymentIds = pays.map(function (p) { return p.id; });
+    }
+    upsert_('receipts', [rc]);
+    return { ok: true, status: rc.status, warnings: W };
+  } finally { lock.releaseLock(); }
 }
 /*CORE-END*/

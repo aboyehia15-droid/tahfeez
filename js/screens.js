@@ -11,7 +11,7 @@ function NAV() {
     { k: 'reports', t: 'التقارير', ic: '📊' },
     canAdmin() && (S.settings.waMode === 'center' || T('outbox').length) && { k: 'outbox', t: 'صندوق رسائل الواتساب', ic: '📮', badge: T('outbox').filter(x => x.status !== 'sent').length || '' },
     f.leaders && { k: 'leaders', t: 'الأوائل والترتيب', ic: '🏆' },
-    canAdmin() && f.fees && { k: 'fees', t: 'الرسوم', ic: '💰' },
+    canAdmin() && f.fees && { k: 'fees', t: 'الرسوم', ic: '💰', badge: T('receipts').filter(x => x.status === 'pending').length || '' },
     isAdmin() && { k: 'settings', t: 'الإعدادات', ic: '⚙️' }
   ].filter(Boolean);
 }
@@ -530,9 +530,12 @@ function feesSettingsDialog() {
   };
   $('[data-ok]', m.el).onclick = () => { saveSettings({ feeDefault: +$('#fd', m.el).value || 0, sibDefault: +$('#fsd', m.el).value || 0 }); m.close(); render(); };
 }
-function viewFees(v) {
+function viewFees(v, sub) {
   const cur = S.settings.currency;
-  v.innerHTML = `<div class="page-head"><h2>💰 الرسوم والسداد</h2><span class="sp"></span><button class="btn light" id="setfee">⚙️ إعدادات الرسوم (${num(S.settings.feeDefault || 0)} ${cur})</button></div>
+  const pend = T('receipts').filter(x => x.status === 'pending').length;
+  const ftabs = `<div class="tabs"><a href="#/fees" class="${sub !== 'receipts' ? 'on' : ''}" style="text-decoration:none"><button class="${sub !== 'receipts' ? 'on' : ''}">📋 كشف السداد</button></a><a href="#/fees/receipts" style="text-decoration:none"><button class="${sub === 'receipts' ? 'on' : ''}">📥 إيصالات أولياء الأمور${pend ? ` <span class="badge" style="position:static;display:inline-block">${pend}</span>` : ''}</button></a></div>`;
+  if (sub === 'receipts') { v.innerHTML = `<div class="page-head"><h2>📥 إيصالات السداد من أولياء الأمور</h2></div>${ftabs}<div id="rcbox"></div>`; receiptsInbox($('#rcbox')); return; }
+  v.innerHTML = `<div class="page-head"><h2>💰 الرسوم والسداد</h2><span class="sp"></span><button class="btn light" id="setfee">⚙️ إعدادات الرسوم (${num(S.settings.feeDefault || 0)} ${cur})</button><button class="btn light" onclick="bankSettingsDialog()">🏦 بيانات الحساب</button></div>${ftabs}
     <div class="grid g4" id="fk"></div>
     <div class="card" style="padding:10px;margin-top:12px"><div class="row"><div class="search grow"><input class="inp" id="fq" placeholder="بحث"></div><select class="inp" id="fc" style="width:auto">${classOptions('', 'كل الفصول')}</select>
       <select class="inp" id="fs" style="width:auto"><option value="">كل الحالات</option><option value="paid">مسدد</option><option value="part">مسدد جزئياً</option><option value="none">غير مسدد</option><option value="free">🎓 معفى</option><option value="disc">🏷️ عليهم خصم</option><option value="sib">👨‍👦 خصم أخوة</option><option value="spec">⭐ خصم خاص</option></select>
