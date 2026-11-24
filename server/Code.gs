@@ -335,15 +335,34 @@ function route_(r) {
   }
   if (a === 'hasSecret') return { ok: true, has: !!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY') };
 
+  if (a === 'saveCur') { // إضافة/تعديل منهج: المعلم يضيف مناهج جديدة ويعدّل ما أضافه هو، والإدارة تعدّل الكل
+    var lockC = LockService.getScriptLock(); lockC.waitLock(20000);
+    try {
+      var stc = settings_(); var list = (stc.curricula || []).slice(); var cu = r.cur || {};
+      var isAdm = me.role === 'admin' || me.role === 'supervisor';
+      var idx = -1; for (var i = 0; i < list.length; i++) if (list[i].id === cu.id) idx = i;
+      if (idx >= 0 && !isAdm && list[idx].by !== me.id) return { ok: false, error: 'يمكنك تعديل المناهج التي أضفتها أنت فقط' };
+      if (r.remove) { if (idx < 0) return { ok: true }; list.splice(idx, 1); }
+      else {
+        if (!cu.name || !(cu.lessons || []).length) return { ok: false, error: 'اسم المنهج والدروس مطلوبة' };
+        if (idx < 0) { cu.id = cu.id || ('cur_' + Utilities.getUuid().slice(0, 8)); cu.by = me.id; cu.byName = me.name; list.push(cu); }
+        else { cu.by = list[idx].by; cu.byName = list[idx].byName; list[idx] = cu; }
+      }
+      stc.curricula = list; stc.updatedAt = Date.now(); delete stc._row; upsert_('settings', [stc]);
+      return { ok: true, curricula: list, id: cu.id };
+    } finally { lockC.releaseLock(); }
+  }
+
   if (a === 'aiGrade') { // قراءة ورقة إجابة الطالب وتصحيحها بالذكاء الاصطناعي
     var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY');
     if (!key) return { ok: false, error: 'لم يُضف مفتاح Claude API — الإعدادات ← الاختبارات' };
     var content = (r.images || []).map(function (im) { return { type: 'image', source: { type: 'base64', media_type: im.mime, data: im.data } }; });
+    (r.docs || []).forEach(function (d) { content.push({ type: 'document', source: { type: 'base64', media_type: d.mime || 'application/pdf', data: d.data } }); }); // ملفات PDF (مثل كتب المناهج)
     content.push({ type: 'text', text: r.prompt });
     var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
       method: 'post', contentType: 'application/json', muteHttpExceptions: true,
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      payload: JSON.stringify({ model: r.model || 'claude-sonnet-5-5', max_tokens: 4000, messages: [{ role: 'user', content: content }] })
+      payload: JSON.stringify({ model: r.model || 'claude-sonnet-5-5', max_tokens: Math.min(+r.maxTokens || 4000, 16000), messages: [{ role: 'user', content: content }] })
     });
     var code = resp.getResponseCode(); var body = resp.getContentText();
     if (code !== 200) return { ok: false, error: 'خطأ من خدمة التصحيح (' + code + '): ' + body.slice(0, 300) };

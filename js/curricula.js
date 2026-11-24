@@ -93,8 +93,8 @@ function curParentCard(s, cid) {
 /* ——— شاشة إعداد المناهج ——— */
 function curriculaSettings(box) {
   const custom = S.settings.curricula || [];
-  box.innerHTML = `<div class="card"><h3>📚 المناهج</h3><p class="small muted">كل منهج مقسم إلى دروس، ولكل درس بنود (مهارات) يسجل المعلم ما أتقنه الطالب منها يومياً. لتفعيل منهج في فصل: الفصول والمعلمون ← تعديل الفصل ← المواد.</p>
-    ${curricula().map(c => { const b = !(S.settings.curricula || []).some(x => x.id === c.id); return `<div class="list-item"><span style="font-size:30px">${c.icon}</span><div style="flex:1"><b>${esc(c.name)}</b><div class="small muted">${c.lessons.length} درساً${c.book ? ' · 📘 ' + esc(c.book.replace('.pdf', '')) : ''}${b ? ' · منهج أساسي' : ' · منهج مضاف'} · مفعّل في ${T('classes').filter(x => (x.subjects || []).includes(c.id)).length} فصل</div></div><button class="btn sm light" data-cv="${c.id}">👁️ الدروس</button>${b ? '' : `<button class="btn sm light" data-ce="${c.id}">✏️</button>`}</div>`; }).join('')}
+  box.innerHTML = `<div class="card"><h3>📚 المناهج</h3><p class="small muted">كل منهج مقسم إلى دروس، ولكل درس بنود (مهارات) يسجل المعلم ما أتقنه الطالب منها يومياً. يمكن رفع المنهج من ملف (Excel أو Word أو PDF أو صورة). ويختار كل معلم مناهج فصله من «📚 مناهج فصلي» في المتابعة اليومية.</p>
+    ${curricula().map(c => { const b = !(S.settings.curricula || []).some(x => x.id === c.id); return `<div class="list-item"><span style="font-size:30px">${c.icon}</span><div style="flex:1"><b>${esc(c.name)}</b><div class="small muted">${c.lessons.length} درساً${c.book ? ' · 📘 ' + esc(c.book.replace('.pdf', '')) : ''}${b ? ' · منهج أساسي' : ' · منهج مضاف' + (c.byName ? ' (أضافه ' + esc(c.byName) + ')' : '')} · مفعّل في ${T('classes').filter(x => (x.subjects || []).includes(c.id)).length} فصل</div></div><button class="btn sm light" data-cv="${c.id}">👁️ الدروس</button>${b ? '' : `<button class="btn sm light" data-ce="${c.id}">✏️</button>`}</div>`; }).join('')}
     <div class="row" style="margin-top:12px"><button class="btn" id="cadd">➕ إضافة منهج جديد</button><button class="btn gold" id="callon">✅ تفعيل جميع المناهج في جميع الفصول</button></div></div>`;
   box.onclick = e => {
     const v = e.target.closest('[data-cv]'); if (v) { const c = curById(v.dataset.cv); modal({ title: c.icon + ' ' + esc(c.name), body: `<table class="tbl"><tr><th>م</th><th>الدرس</th><th>الصفحة</th><th>البنود</th></tr>${c.lessons.map((l, i) => `<tr><td>${i + 1}</td><td class="r"><b>${esc(l.t)}</b></td><td>${esc(l.p || '')}</td><td class="r small">${l.items.map(esc).join('، ')}</td></tr>`).join('')}</table>`, foot: false, wide: true }); }
@@ -103,27 +103,100 @@ function curriculaSettings(box) {
     if (e.target.id === 'callon') { enableAllCurricula(); render(); }
   };
 }
-function curForm(c) {
+function curForm(c, onSaved) {
   c = c || { icon: '📗', color: '#2c8a4b', lessons: [] };
+  const mine = !c.id || canAdmin() || (S.me && c.by === S.me.id);
   const txt = c.lessons.map(l => l.t + (l.p ? ' [' + l.p + ']' : '') + ' : ' + l.items.join('، ')).join('\n');
-  const m = modal({ title: c.id ? 'تعديل المنهج' : 'منهج جديد', wide: true, body: `<div class="grid g3"><div class="field"><label class="req">اسم المنهج</label><input class="inp" id="cn" value="${esc(c.name || '')}" placeholder="مثال: التربية الإسلامية"></div><div class="field"><label>رمز (إيموجي)</label><input class="inp" id="ci" value="${esc(c.icon)}"></div><div class="field"><label>اللون</label><input class="inp" type="color" id="cc" value="${c.color}"></div></div>
+  const m = modal({ title: c.id ? 'تعديل المنهج' : '📚 منهج جديد', wide: true, body: `
+    ${mine ? `<div class="card" style="background:#eef8f5;padding:10px 12px"><div class="row" style="gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:200px">📤 رفع ملف المنهج <span class="small muted" style="font-weight:400">— Excel أو Word أو PDF أو صورة أو نص، فتُستخرج الدروس والبنود تلقائياً لتراجعها قبل الحفظ</span></b>
+      <label class="btn"><input type="file" id="cfile" accept=".xlsx,.xls,.csv,.txt,.docx,.pdf,image/*" hidden>📤 اختيار الملف</label></div><div class="small" id="cfst" style="margin-top:6px"></div></div>` : ''}
+    <div class="grid g3"><div class="field"><label class="req">اسم المنهج</label><input class="inp" id="cn" value="${esc(c.name || '')}" placeholder="مثال: التربية الإسلامية"></div><div class="field"><label>رمز (إيموجي)</label><input class="inp" id="ci" value="${esc(c.icon || '📗')}"></div><div class="field"><label>اللون</label><input class="inp" type="color" id="cc" value="${c.color || '#2c8a4b'}"></div></div>
     <div class="field"><label>اسم الكتاب (اختياري)</label><input class="inp" id="cb" value="${esc(c.book || '')}"></div>
-    <div class="field"><label>الدروس — درس في كل سطر، وبعد النقطتين بنود الدرس مفصولة بفاصلة. ويمكن كتابة الصفحة بين قوسين [ ]</label><textarea class="inp" id="cl" rows="12" placeholder="الدرس الأول: الوضوء [5] : معرفة الفرائض، تطبيق عملي، الدعاء بعده&#10;الدرس الثاني: الصلاة : عدد الركعات، الحركات، الأذكار">${esc(txt)}</textarea></div>
-    <div class="small muted">إن لم تكتب بنوداً لدرس يُعتبر بنداً واحداً «الدرس كاملاً».</div>`, foot: `<button class="btn" data-ok>💾 حفظ المنهج</button>${c.id ? '<button class="btn red" data-del>🗑️ حذف</button>' : ''}` });
-  $('[data-ok]', m.el).onclick = () => {
-    const name = $('#cn', m.el).value.trim(); if (!name) return toast('اكتب اسم المنهج');
-    const lessons = $('#cl', m.el).value.split('\n').map(x => x.trim()).filter(Boolean).map(line => {
-      const parts = line.split(/\s:\s|:(?=[^:]*$)/); let t = parts[0].trim(); let p = ''; const pm = t.match(/\[([^\]]+)\]/); if (pm) { p = pm[1]; t = t.replace(pm[0], '').trim(); }
-      const items = (parts[1] || '').split(/[،,]/).map(x => x.trim()).filter(Boolean);
-      return { t, p, items: items.length ? items : ['الدرس كاملاً'] };
-    });
-    if (!lessons.length) return toast('اكتب درساً واحداً على الأقل');
-    const list = (S.settings.curricula || []).slice(); const obj = Object.assign({}, c, { name, icon: $('#ci', m.el).value || '📗', color: $('#cc', m.el).value, book: $('#cb', m.el).value.trim(), lessons });
-    if (!obj.id) { obj.id = 'cur_' + uid(); list.push(obj); } else list[list.findIndex(x => x.id === obj.id)] = obj;
-    saveSettings({ curricula: list }); m.close(); toast('✔️ حُفظ المنهج'); render();
+    <div class="field"><label>الدروس — درس في كل سطر، وبعد النقطتين بنود الدرس مفصولة بفاصلة. ويمكن كتابة الصفحة بين قوسين [ ]</label><textarea class="inp" id="cl" rows="12" placeholder="الدرس الأول: الوضوء [5] : معرفة الفرائض، تطبيق عملي، الدعاء بعده&#10;الدرس الثاني: الصلاة [9] : الأركان، الواجبات">${esc(txt)}</textarea></div>
+    <div class="small muted">إن لم تكتب بنوداً لدرس يُعتبر بنداً واحداً «الدرس كاملاً». <span id="ccount"></span></div>`,
+    foot: mine ? `<button class="btn" data-ok>💾 حفظ المنهج</button>${c.id ? '<button class="btn red" data-del>🗑️ حذف</button>' : ''}` : '<span class="small muted">هذا المنهج أضافه غيرك — يعدّله صاحبه أو الإدارة</span>' });
+  const cnt = () => { const n = $('#cl', m.el).value.split('\n').filter(x => x.trim()).length; $('#ccount', m.el).textContent = n ? '— عدد الدروس: ' + n : ''; };
+  $('#cl', m.el).oninput = cnt; cnt();
+  const fi = $('#cfile', m.el); if (fi) fi.onchange = async e => {
+    const f = e.target.files[0]; if (!f) return; const st = $('#cfst', m.el);
+    st.innerHTML = '⏳ جاري قراءة «' + esc(f.name) + '»…';
+    try {
+      const r = await importCurFile(f, msg => st.innerHTML = '⏳ ' + msg);
+      if (!r.lessons.length) throw new Error('لم أجد دروساً في الملف');
+      if (r.name && !$('#cn', m.el).value.trim()) $('#cn', m.el).value = r.name;
+      if (!$('#cb', m.el).value.trim()) $('#cb', m.el).value = f.name.replace(/\.[^.]+$/, '');
+      $('#cl', m.el).value = r.lessons.map(l => l.t + (l.p ? ' [' + l.p + ']' : '') + ' : ' + (l.items || []).join('، ')).join('\n'); cnt();
+      st.innerHTML = `✔️ استُخرج <b>${r.lessons.length}</b> ${r.lessons.length >= 3 && r.lessons.length <= 10 ? 'دروس' : 'درساً'} — راجعها وعدّل ما تريد ثم اضغط «💾 حفظ المنهج»`;
+    } catch (er) { st.innerHTML = '<span style="color:var(--red)">⚠️ ' + esc((er && er.message) || 'تعذر قراءة الملف') + '</span>'; }
+    e.target.value = '';
   };
-  const d = $('[data-del]', m.el); if (d) d.onclick = async () => { if (await confirmBox('حذف المنهج «' + c.name + '»؟ (تبقى تسجيلات الطلاب السابقة محفوظة)')) { saveSettings({ curricula: (S.settings.curricula || []).filter(x => x.id !== c.id) }); m.close(); render(); } };
+  const ok = $('[data-ok]', m.el); if (ok) ok.onclick = async () => {
+    const name = $('#cn', m.el).value.trim(); if (!name) return toast('اكتب اسم المنهج');
+    const lessons = parseCurLines($('#cl', m.el).value);
+    if (!lessons.length) return toast('اكتب درساً واحداً على الأقل');
+    const obj = Object.assign({}, c, { name, icon: $('#ci', m.el).value || '📗', color: $('#cc', m.el).value, book: $('#cb', m.el).value.trim(), lessons });
+    ok.disabled = true;
+    try { const id = await saveCurriculum(obj); m.close(); toast('✔️ حُفظ المنهج «' + name + '» وانضم إلى قائمة المناهج'); if (onSaved) onSaved(id); render(); }
+    catch (er) { toast('⚠️ ' + er.message); ok.disabled = false; }
+  };
+  const d = $('[data-del]', m.el); if (d) d.onclick = async () => { if (await confirmBox('حذف المنهج «' + c.name + '»؟ (تبقى تسجيلات الطلاب السابقة محفوظة)')) { try { await saveCurriculum(c, true); m.close(); render(); } catch (er) { toast('⚠️ ' + er.message); } } };
 }
+/* تحويل نص الدروس إلى دروس وبنود */
+function parseCurLines(text) {
+  return String(text || '').split('\n').map(x => x.trim()).filter(Boolean).map(line => {
+    const parts = line.split(/\s:\s|:(?=[^:]*$)/); let t = parts[0].trim(); let p = ''; const pm = t.match(/\[([^\]]+)\]/); if (pm) { p = pm[1]; t = t.replace(pm[0], '').trim(); }
+    const items = (parts[1] || '').split(/[،,]/).map(x => x.trim()).filter(Boolean);
+    return { t, p, items: items.length ? items : ['الدرس كاملاً'] };
+  }).filter(l => l.t);
+}
+/* حفظ المنهج: الإدارة مباشرة، والمعلم عبر الخادم (يضيف مناهج جديدة ويعدّل ما أضافه) */
+async function saveCurriculum(obj, remove) {
+  const list = (S.settings.curricula || []).slice();
+  if (canAdmin() && (isLocal() || !S.server)) {
+    if (remove) saveSettings({ curricula: list.filter(x => x.id !== obj.id) });
+    else { if (!obj.id) { obj.id = 'cur_' + uid(); obj.by = S.me ? S.me.id : ''; list.push(obj); } else list[list.findIndex(x => x.id === obj.id)] = obj; saveSettings({ curricula: list }); }
+    return obj.id;
+  }
+  const r = await api('saveCur', { cur: obj, remove: !!remove }); if (!r.ok) throw new Error(r.error || 'تعذر الحفظ');
+  const main = (S.data.settings || []).find(x => x.id === 'main'); if (main) { main.curricula = r.curricula; } else S.data.settings = [{ id: 'main', curricula: r.curricula }];
+  persist(); return r.id;
+}
+/* قراءة ملف المنهج: Excel/CSV/نص محلياً، وWord نصاً، وPDF والصور بالذكاء الاصطناعي */
+async function importCurFile(f, status) {
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+  if (['xlsx', 'xls', 'csv'].includes(ext)) {
+    status('قراءة الجدول…'); try { await loadXLSX(); } catch (e) { throw new Error('تعذر تحميل أداة قراءة Excel — تحقق من الإنترنت وأعد المحاولة'); }
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' }); const ws = wb.Sheets[wb.SheetNames[0]];
+    let rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }).map(r => r.map(x => String(x).trim())).filter(r => r.some(Boolean));
+    if (rows.length && /درس|الدرس|العنوان|lesson/i.test(rows[0].join(' ')) && !/^\d/.test(rows[0][0])) rows = rows.slice(1);
+    const lessons = rows.map(r => { const cells = r.filter(Boolean); if (!cells.length) return null; let t = cells[0], p = '', rest = cells.slice(1);
+      if (/^\d+$/.test(t) && cells.length > 1) { t = cells[1]; rest = cells.slice(2); } // عمود الترقيم
+      if (rest.length && /^\d+(\s*[-–]\s*\d+)?$/.test(rest[0])) { p = rest[0]; rest = rest.slice(1); } // عمود الصفحة
+      const items = rest.length === 1 ? rest[0].split(/[،,]/).map(x => x.trim()).filter(Boolean) : rest;
+      return { t, p, items: items.length ? items : ['الدرس كاملاً'] }; }).filter(Boolean);
+    return { name: wb.SheetNames[0] && !/^sheet\d*$/i.test(wb.SheetNames[0]) ? wb.SheetNames[0] : '', lessons };
+  }
+  let text = '';
+  if (ext === 'txt') text = await f.text();
+  else if (ext === 'docx') { status('قراءة ملف Word…'); try { await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js'); } catch (e) { throw new Error('تعذر تحميل أداة قراءة Word — تحقق من الإنترنت وأعد المحاولة'); } text = (await mammoth.extractRawText({ arrayBuffer: await f.arrayBuffer() })).value; }
+  // نص منسّق مسبقاً (درس : بنود) يُقرأ مباشرة
+  if (text && text.split('\n').filter(l => /:/.test(l)).length >= 3) return { name: '', lessons: parseCurLines(text) };
+  if (isLocal()) { if (text) return { name: '', lessons: parseCurLines(text) }; throw new Error('قراءة PDF والصور تحتاج الربط بالخادم ومفتاح الذكاء الاصطناعي — أو ارفع ملف Excel/Word'); }
+  status('🤖 يقرأ الذكاء الاصطناعي الملف ويستخرج الدروس… (قد يستغرق دقيقة)');
+  const payload = { prompt: CUR_AI_PROMPT + (text ? '\n\nنص الكتاب:\n' + text.slice(0, 60000) : ''), maxTokens: 12000 };
+  if (!text) {
+    if (f.size > 25 * 1024 * 1024) throw new Error('الملف أكبر من 25 ميجا — قسّمه أو ارفع فهرس الكتاب فقط');
+    const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = no; fr.readAsDataURL(f); });
+    if (ext === 'pdf') payload.docs = [{ mime: 'application/pdf', data: b64 }]; else payload.images = [{ mime: f.type || 'image/jpeg', data: b64 }];
+  }
+  const r = await api('aiGrade', payload); if (!r.ok) throw new Error(r.error);
+  const j = String(r.text || '').match(/\{[\s\S]*\}/); if (!j) throw new Error('لم أستطع قراءة الدروس من الملف');
+  const o = JSON.parse(j[0]);
+  return { name: o.name || '', lessons: (o.lessons || []).map(l => ({ t: String(l.t || l.title || '').trim(), p: String(l.p || l.page || '').trim(), items: (l.items || []).map(x => String(x).trim()).filter(Boolean) })).filter(l => l.t).map(l => (l.items.length || (l.items = ['الدرس كاملاً']), l)) };
+}
+const CUR_AI_PROMPT = `هذا كتاب أو منهج تعليمي للأطفال. استخرج منه قائمة الدروس بالترتيب، ولكل درس بنوده (المهارات أو الأهداف أو الفقرات التي يُقيَّم فيها الطفل، من 1 إلى 8 بنود قصيرة)، ورقم الصفحة إن وُجد.
+أجب بـ JSON فقط دون أي شرح، بهذا الشكل:
+{"name":"اسم المنهج أو الكتاب","lessons":[{"t":"عنوان الدرس","p":"رقم الصفحة","items":["بند 1","بند 2"]}]}`;
 
 /* تفعيل كل المناهج في كل الفصول (مرة واحدة تلقائياً عند فتح المدير للتطبيق، ومتاح بزر في الإعدادات) */
 function enableAllCurricula(silent) {
@@ -188,8 +261,17 @@ function classSubjectsDialog(cid) {
   const m = modal({ title: '📚 مناهج ' + esc(c.name), body: `
     <p class="small muted" style="margin-top:0">اختر ما تدرّسه في هذا الفصل فقط. تظهر المواد المختارة في المتابعة اليومية والتقارير والاختبارات وصفحة ولي الأمر، ولا تظهر غيرها. التسجيلات السابقة لا تُحذف.</p>
     <div class="sec-h">المواد الأساسية</div>${base.map(([k, t]) => chip(k, t)).join('')}
-    <div class="sec-h" style="margin-top:10px">المناهج</div>${curricula().map(cu => chip(cu.id, cu.icon + ' ' + esc(cu.name), cu.lessons.length + ' درساً')).join('') || '<div class="small muted">لا توجد مناهج</div>'}`,
+    <div class="sec-h" style="margin-top:10px">المناهج</div>${curricula().map(cu => chip(cu.id, cu.icon + ' ' + esc(cu.name), cu.lessons.length + ' درساً' + (cu.byName ? ' · أضافه ' + esc(cu.byName) : ''))).join('') || '<div class="small muted">لا توجد مناهج</div>'}
+    <button class="btn light block" id="cs-add" style="margin-top:10px">➕ إضافة منهج جديد أو رفع ملف منهج</button>`,
     foot: '<button class="btn" data-ok>💾 حفظ مناهج الفصل</button>' });
+  $('#cs-add', m.el).onclick = () => {
+    const keep = $$('.cs:checked', m.el).map(x => x.value); m.close();
+    curForm(null, id => { // المنهج الجديد يُضاف لفصلك مباشرة مع ما اخترته
+      const hidden = (c.subjects || []).filter(k => !isCur(k) && !f[k]);
+      c.subjects = hidden.concat(keep.filter(k => k !== id), [id]); c.subjSet = 1; c.updatedAt = Date.now(); save('classes', c);
+      setTimeout(() => classSubjectsDialog(cid), 300);
+    });
+  };
   $('[data-ok]', m.el).onclick = () => {
     const sel = $$('.cs:checked', m.el).map(x => x.value);
     if (!sel.length) return toast('اختر مادة واحدة على الأقل');
