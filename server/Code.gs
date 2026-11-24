@@ -446,7 +446,7 @@ function receiptChecks_(f, hash, ignoreId) {
     if (rcps.some(function (x) { return (digits_(x.ref) || String(x.ref || '').trim()) === ref; }) || readAll_('payments').some(function (p) { return p.ref && (digits_(p.ref) || p.ref) === ref; })) W.push('رقم العملية ' + f.ref + ' مستخدم في إيصال سابق');
   } else W.push('لم يظهر رقم العملية في الإيصال');
   if (hash && rcps.some(function (x) { return x.hash === hash; })) W.push('هذه الصورة نفسها رُفعت من قبل');
-  if (!(+f.amount > 0)) W.push('لم يُحدَّد المبلغ');
+  if (!(+f.amount > 0)) W.push('لم يُقرأ المبلغ من الإيصال — حدّده من الصورة عند الاعتماد');
   if (f.date) { var d = new Date(f.date + 'T12:00:00'); var days = (Date.now() - d.getTime()) / 864e5; if (days > 90) W.push('تاريخ التحويل قديم (أكثر من 3 أشهر)'); if (days < -1) W.push('تاريخ التحويل في المستقبل'); }
   else W.push('لم يظهر تاريخ التحويل');
   return W;
@@ -473,13 +473,13 @@ function parentReceipt_(a, r) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var fs = r.fields || {}; var sibIds = siblingsOf_(stu, all).map(function (x) { return x.id; }).concat([stu.id]);
-    var alloc = (r.alloc && r.alloc.length ? r.alloc : [{ studentId: stu.id, amount: +fs.amount }]).filter(function (q) { return sibIds.indexOf(q.studentId) >= 0 && +q.amount > 0; })
+    var alloc = (r.alloc && r.alloc.length ? r.alloc : [{ studentId: stu.id, amount: +fs.amount || 0 }]).filter(function (q) { return sibIds.indexOf(q.studentId) >= 0 && (+q.amount > 0 || !(r.alloc && r.alloc.length)); })
       .map(function (q) { var sx = all.filter(function (x) { return x.id === q.studentId; })[0]; return { studentId: q.studentId, name: sx ? sx.name : '', classId: sx ? sx.classId : '', amount: +q.amount }; });
     if (!alloc.length) return { ok: false, error: 'حدد المبلغ' };
     var total = alloc.reduce(function (n, q) { return n + q.amount; }, 0);
-    var f2 = { amount: +fs.amount || total, date: String(fs.date || '').slice(0, 10), payer: String(fs.payer || '').slice(0, 80), relation: String(fs.relation || '').slice(0, 40), fromBank: String(fs.fromBank || '').slice(0, 60), ref: String(fs.ref || '').slice(0, 60), toAccount: String(fs.toAccount || '').slice(0, 40), note: String(fs.note || '').slice(0, 200) };
+    var f2 = { amount: +fs.amount || total || 0, date: String(fs.date || '').slice(0, 10), payer: String(fs.payer || '').slice(0, 80), relation: String(fs.relation || '').slice(0, 40), fromBank: String(fs.fromBank || '').slice(0, 60), ref: String(fs.ref || '').slice(0, 60), toAccount: String(fs.toAccount || '').slice(0, 40), note: String(fs.note || '').slice(0, 200) };
     var W = receiptChecks_(f2, r.hash);
-    if (Math.abs(total - f2.amount) > 0.5) W.push('مجموع التوزيع على الأبناء (' + total + ') لا يساوي مبلغ الإيصال (' + f2.amount + ')');
+    if (f2.amount && Math.abs(total - f2.amount) > 0.5) W.push('مجموع التوزيع على الأبناء (' + total + ') لا يساوي مبلغ الإيصال (' + f2.amount + ')');
     var rc = { id: 'rc' + Utilities.getUuid().replace(/-/g, '').slice(0, 12), studentId: stu.id, classId: stu.classId, studentName: stu.name, guardianName: stu.guardianName || '', guardianPhone: stu.guardianPhone || '',
       amount: f2.amount, date: f2.date, payer: f2.payer, relation: f2.relation, fromBank: f2.fromBank, ref: f2.ref, toLast4: digits_(f2.toAccount).slice(-4), note: f2.note,
       alloc: alloc, fileId: String(r.fileId || ''), hash: String(r.hash || ''), warnings: W, aiRead: !!r.ai, status: 'pending', createdAt: Date.now(), updatedAt: Date.now() };

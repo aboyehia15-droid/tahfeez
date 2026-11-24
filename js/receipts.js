@@ -11,64 +11,32 @@ function bankBoxHTML() {
     ${st.payNote ? `<div class="small" style="margin-top:6px">✍️ اكتب في ملاحظات التحويل: <b>${esc(st.payNote)}</b></div>` : ''}</div>`;
 }
 
-/* ——— ولي الأمر: رفع إيصال السداد ——— */
+/* ——— ولي الأمر: رفع إيصال السداد بخطوة واحدة (تصوير فقط، والباقي تلقائي) ——— */
 async function parentReceiptDialog(s) {
-  const tok = (typeof PVIEW !== 'undefined' && URLQ.get('p')) || s.parentToken;
+  const tok = URLQ.get('p') || s.parentToken;
   const cur = S.settings.currency;
-  const m = modal({ title: '📤 رفع إيصال سداد — ' + esc(s.name), body: `
-    <div id="rcp-step1">
-      <p class="small muted" style="margin-top:0">صوّر إيصال التحويل أو ارفع لقطة الشاشة من تطبيق البنك (أو ملف PDF). يقرأ البرنامج المبلغ والتاريخ ورقم العملية تلقائياً، ثم تراجعها قبل الإرسال.</p>
-      <label class="btn block" style="padding:16px;font-size:18px"><input type="file" id="rcp-file" accept="image/*,.pdf" hidden>📷 تصوير أو اختيار الإيصال</label>
-      <div id="rcp-st" class="small" style="margin-top:8px;text-align:center"></div>
-      ${bankBoxHTML()}
-    </div><div id="rcp-step2" hidden></div>`, foot: false });
-  let read = null;
+  const m = modal({ title: '📤 إيصال سداد — ' + esc(s.name), body: `
+    <div id="rcp-box" style="text-align:center">
+      <p style="margin-top:0">صوّر إيصال التحويل أو اختر صورته، وسيُسجَّل باسم <b>${esc(s.name)}</b> تلقائياً.</p>
+      <label class="btn block" style="padding:18px;font-size:19px"><input type="file" id="rcp-file" accept="image/*,.pdf" hidden>📷 تصوير الإيصال</label>
+      <div id="rcp-st" style="margin-top:10px"></div>
+    </div>`, foot: false });
   $('#rcp-file', m.el).onchange = async e => {
-    const f = e.target.files[0]; if (!f) return; const stl = $('#rcp-st', m.el);
-    stl.innerHTML = '⏳ جاري رفع الإيصال وقراءته… (قد يستغرق نصف دقيقة)';
+    const f = e.target.files[0]; if (!f) return; const stl = $('#rcp-st', m.el); const lbl = $('label', m.el);
+    lbl.style.display = 'none'; stl.innerHTML = '<div style="font-size:40px">⏳</div>جاري إرسال الإيصال…';
     try {
-      const file = await pickReceiptFile(f); if (!file) throw new Error('تعذر قراءة الملف');
+      const file = await pickReceiptFile(f); if (!file) throw new Error('تعذر قراءة الصورة');
       const mm = String(file.data).match(/^data:([^;]+);base64,(.*)$/);
-      const r = await api('parentReceiptRead', { t: tok, mime: mm[1], data: mm[2], name: f.name });
-      if (!r.ok) throw new Error(r.error);
-      read = r; step2();
-    } catch (er) { stl.innerHTML = '<span style="color:var(--red)">⚠️ ' + esc((er && er.message) || 'تعذر الرفع') + '</span>'; }
+      const r = await api('parentReceiptRead', { t: tok, mime: mm[1], data: mm[2], name: f.name }); if (!r.ok) throw new Error(r.error);
+      const fl = r.fields || {};
+      const r2 = await api('parentReceiptSubmit', { t: tok, fileId: r.fileId, hash: r.hash, ai: r.ai, fields: { amount: fl.amount, date: fl.date, payer: fl.payer, fromBank: fl.fromBank, ref: fl.ref, toAccount: fl.toAccount, note: fl.note } });
+      if (!r2.ok) throw new Error(r2.error);
+      $('#rcp-box', m.el).innerHTML = `<div style="font-size:54px">${r2.status === 'approved' ? '✅' : '📨'}</div><h3 style="margin:6px 0">وصل الإيصال، جزاكم الله خيراً</h3>
+        ${+fl.amount ? `<div style="font-size:20px">المبلغ: <b>${num(fl.amount)}</b> ${cur}</div>` : ''}
+        <div class="small muted" style="margin-top:6px">${r2.status === 'approved' ? 'تم اعتماده وتسجيله في الرسوم.' : 'سيظهر في الرسوم بعد مراجعة الإدارة.'}</div>
+        <button class="btn block" style="margin-top:14px" onclick="location.reload()">تم</button>`;
+    } catch (er) { lbl.style.display = ''; stl.innerHTML = '<span style="color:var(--red)">⚠️ ' + esc((er && er.message) || 'تعذر الإرسال') + ' — حاول مرة أخرى</span>'; }
     e.target.value = '';
-  };
-  const step2 = () => {
-    const f = read.fields || {}; const sibs = read.siblings || [];
-    $('#rcp-step1', m.el).hidden = true; const b = $('#rcp-step2', m.el); b.hidden = false;
-    b.innerHTML = `
-      ${read.ai ? '<div class="small" style="background:#eef8f5;border-radius:10px;padding:8px 10px;margin-bottom:8px">🤖 قرأ البرنامج الإيصال — راجع البيانات وصحّح ما يلزم.</div>' : '<div class="small" style="background:#fff8e1;border-radius:10px;padding:8px 10px;margin-bottom:8px">✍️ اكتب بيانات الإيصال كما تظهر فيه.</div>'}
-      ${(read.warnings || []).length ? `<div class="small" style="background:#fff3f3;border-radius:10px;padding:8px 10px;margin-bottom:8px;color:#9b1c1c">${read.warnings.map(w => '⚠️ ' + esc(w)).join('<br>')}</div>` : ''}
-      <div class="grid g2">
-        <div class="field"><label class="req">المبلغ (${cur})</label><input class="inp" id="rf-amount" type="number" inputmode="decimal" value="${esc(f.amount || '')}"></div>
-        <div class="field"><label class="req">تاريخ التحويل</label><input class="inp" id="rf-date" type="date" value="${esc(f.date || todayISO())}"></div>
-        <div class="field"><label>اسم صاحب الحساب المحوِّل</label><input class="inp" id="rf-payer" value="${esc(f.payer || '')}"></div>
-        <div class="field"><label>التحويل من حساب</label><select class="inp" id="rf-rel">${RCP_REL.map(x => `<option>${x}</option>`).join('')}</select></div>
-        <div class="field"><label>البنك المحوِّل منه</label><input class="inp" id="rf-bank" value="${esc(f.fromBank || '')}"></div>
-        <div class="field"><label>رقم العملية / المرجع</label><input class="inp" id="rf-ref" dir="ltr" value="${esc(f.ref || '')}"></div>
-      </div>
-      ${sibs.length ? `<div class="sec-h" style="margin-top:6px">👨‍👩‍👧 هل التحويل عن أكثر من ابن؟ وزّع المبلغ</div>
-        ${[{ id: s.id, name: s.name }].concat(sibs).map((x, i) => `<div class="row" style="gap:8px;margin:4px 0"><label class="row" style="flex:1;gap:6px"><input type="checkbox" class="rf-sib" data-id="${x.id}" ${i === 0 ? 'checked' : ''}> ${esc(x.name)}</label><input class="inp rf-am" data-id="${x.id}" type="number" style="width:110px" value="${i === 0 ? esc(f.amount || '') : ''}" placeholder="المبلغ"></div>`).join('')}
-        <div class="small muted" id="rf-sum"></div>` : ''}
-      <button class="btn block" id="rf-send" style="margin-top:12px">📨 إرسال الإيصال للإدارة</button>`;
-    const sumUpd = () => { const t = $$('.rf-sib:checked', b).reduce((n, c) => n + (+$(`.rf-am[data-id="${c.dataset.id}"]`, b).value || 0), 0); const el = $('#rf-sum', b); if (el) el.innerHTML = `المجموع: <b>${num(t)}</b> ${cur}` + (Math.abs(t - (+$('#rf-amount', b).value || 0)) > .5 ? ' <span style="color:var(--red)">— لا يساوي مبلغ الإيصال</span>' : ' ✔️'); };
-    b.addEventListener('input', e => { if (e.target.id === 'rf-amount' && sibs.length && $$('.rf-sib:checked', b).length === 1) { const c = $$('.rf-sib:checked', b)[0]; $(`.rf-am[data-id="${c.dataset.id}"]`, b).value = e.target.value; } sumUpd(); });
-    b.addEventListener('change', sumUpd); sumUpd();
-    $('#rf-send', b).onclick = async () => {
-      const amount = +$('#rf-amount', b).value; if (!amount) return toast('اكتب المبلغ');
-      const alloc = sibs.length ? $$('.rf-sib:checked', b).map(c => ({ studentId: c.dataset.id, amount: +$(`.rf-am[data-id="${c.dataset.id}"]`, b).value || 0 })).filter(q => q.amount > 0) : [{ studentId: s.id, amount }];
-      if (!alloc.length) return toast('حدد الابن والمبلغ');
-      const btn = $('#rf-send', b); btn.disabled = true; btn.textContent = '⏳ جاري الإرسال…';
-      try {
-        const r = await api('parentReceiptSubmit', { t: tok, fileId: read.fileId, hash: read.hash, ai: read.ai, alloc,
-          fields: { amount, date: $('#rf-date', b).value, payer: $('#rf-payer', b).value, relation: $('#rf-rel', b).value, fromBank: $('#rf-bank', b).value, ref: $('#rf-ref', b).value, toAccount: (read.fields || {}).toAccount || '', note: (read.fields || {}).note || '' } });
-        if (!r.ok) throw new Error(r.error);
-        b.innerHTML = `<div class="empty"><span class="e">${r.status === 'approved' ? '✅' : '📨'}</span><b>${r.status === 'approved' ? 'تم اعتماد السداد وتسجيله' : 'وصل الإيصال إلى الإدارة'}</b><div class="small muted" style="margin-top:6px">${r.status === 'approved' ? 'يظهر الآن في سجل الرسوم.' : 'يظهر في صفحتك «⏳ قيد المراجعة» حتى تعتمده الإدارة.'} جزاكم الله خيراً</div></div>`;
-        setTimeout(() => location.reload(), 2500);
-      } catch (er) { toast('⚠️ ' + ((er && er.message) || 'تعذر الإرسال')); btn.disabled = false; btn.textContent = '📨 إرسال الإيصال للإدارة'; }
-    };
   };
 }
 function parentReceiptsList(list) {
@@ -86,9 +54,9 @@ function receiptsInbox(box) {
     <div class="row small" style="margin-bottom:8px;gap:10px;flex-wrap:wrap"><label class="row"><input type="checkbox" id="rc-on" ${S.settings.receiptOn !== false ? 'checked' : ''}> زر «رفع إيصال سداد» في صفحة ولي الأمر</label><label class="row"><input type="checkbox" id="rc-auto" ${S.settings.receiptAuto ? 'checked' : ''}> اعتماد تلقائي للإيصال إذا اجتاز كل الفحوص</label><button class="btn sm light" id="rc-bank">🏦 بيانات الحساب</button></div>
     ${list.length ? list.map(x => `<div class="card" style="padding:10px 12px"><div class="row" style="gap:10px;align-items:flex-start;flex-wrap:wrap">
       <button class="btn light" data-img="${x.id}" style="width:86px;height:86px;padding:0;font-size:30px" title="عرض الإيصال">🧾</button>
-      <div style="flex:1;min-width:220px"><div><b style="font-size:19px">${num(x.amount)}</b> ${cur} ${rcpStatus(x.status)} <span class="small muted">${x.date ? fmtDate(x.date, false) : ''} · رُفع ${new Date(x.createdAt || 0).toLocaleString('ar-SA-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' })}</span></div>
+      <div style="flex:1;min-width:220px"><div><b style="font-size:19px">${+x.amount ? num(x.amount) + '</b> ' + cur : '؟</b> <span class="small" style="color:var(--red)">المبلغ لم يُقرأ</span>'} ${rcpStatus(x.status)} <span class="small muted">${x.date ? fmtDate(x.date, false) : ''} · رُفع ${new Date(x.createdAt || 0).toLocaleString('ar-SA-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' })}</span></div>
         <div class="small" style="margin-top:3px">👦 ${(x.alloc || []).map(q => `<b>${esc(q.name || (byId('students', q.studentId) || {}).name || '')}</b>${(x.alloc || []).length > 1 ? ' (' + num(q.amount) + ')' : ''}`).join(' · ')} — ولي الأمر: ${esc(x.guardianName || '')}</div>
-        <div class="small muted">المحوِّل: <b>${esc(x.payer || '—')}</b> (${esc(x.relation || '')})${x.fromBank ? ' · ' + esc(x.fromBank) : ''}${x.ref ? ' · عملية <span dir="ltr">' + esc(x.ref) + '</span>' : ''}${x.toLast4 ? ' · إلى حساب …' + esc(x.toLast4) : ''}</div>
+        <div class="small muted">المحوِّل: <b>${esc(x.payer || '—')}</b>${x.relation ? ' (' + esc(x.relation) + ')' : ''}${x.fromBank ? ' · ' + esc(x.fromBank) : ''}${x.ref ? ' · عملية <span dir="ltr">' + esc(x.ref) + '</span>' : ''}${x.toLast4 ? ' · إلى حساب …' + esc(x.toLast4) : ''}</div>
         ${(x.warnings || []).length ? `<div class="small" style="color:#9b1c1c;margin-top:4px">${x.warnings.map(w => '⚠️ ' + esc(w)).join('<br>')}</div>` : '<div class="small" style="color:var(--green);margin-top:4px">✔️ اجتاز كل الفحوص</div>'}
         ${x.status === 'rejected' ? `<div class="small" style="color:var(--red)">سبب الرفض: ${esc(x.reason || '')}</div>` : ''}${x.status === 'approved' ? `<div class="small muted">اعتمده: ${esc(x.approvedBy || '')}</div>` : ''}</div>
       <div class="row" style="gap:6px;flex-wrap:wrap">${x.status === 'pending' ? `<button class="btn" data-ok="${x.id}">✅ اعتماد</button><button class="btn red" data-no="${x.id}">❌ رفض</button>` : ''}${x.guardianPhone ? `<button class="btn sm wa" data-notify="${x.id}">💬 إشعار</button>` : ''}</div></div></div>`).join('') : `<div class="empty"><span class="e">${tab === 'pending' ? '✅' : '📭'}</span>${tab === 'pending' ? 'لا توجد إيصالات بانتظار المراجعة' : 'لا يوجد'}</div>`}`;
@@ -96,7 +64,12 @@ function receiptsInbox(box) {
     const t = e.target.closest('[data-rt]'); if (t) { sessionStorage.setItem('rcpt', t.dataset.rt); return receiptsInbox(box); }
     if (e.target.id === 'rc-bank') return bankSettingsDialog();
     const im = e.target.closest('[data-img]'); if (im) return showReceiptImage(byId('receipts', im.dataset.img));
-    const ok = e.target.closest('[data-ok]'); if (ok) { const x = byId('receipts', ok.dataset.ok); if ((x.warnings || []).length && !(await confirmBox('على هذا الإيصال تنبيهات:\n' + x.warnings.join('\n') + '\n\nاعتماده مع ذلك؟'))) return; approveReceipt(x); toast('✔️ اعتُمد وسُجّل في كشف السداد'); return receiptsInbox(box); }
+    const ok = e.target.closest('[data-ok]'); if (ok) { const x = byId('receipts', ok.dataset.ok);
+      const am = await promptBox('المبلغ المعتمد (' + S.settings.currency + ') — صحّحه إن لزم بعد النظر في الإيصال:', String(x.amount || '')); if (am == null) return;
+      const v = +toLatin(am).replace(/[^\d.]/g, ''); if (!v) return toast('اكتب المبلغ');
+      if (v !== +x.amount) { x.amount = v; if ((x.alloc || []).length === 1) x.alloc[0].amount = v; }
+      if ((x.alloc || []).length === 1 && !(+x.alloc[0].amount)) x.alloc[0].amount = v;
+      approveReceipt(x); toast('✔️ اعتُمد وسُجّل في كشف السداد'); return receiptsInbox(box); }
     const no = e.target.closest('[data-no]'); if (no) { const x = byId('receipts', no.dataset.no); const why = await promptBox('سبب رفض الإيصال (يُرسل لولي الأمر):', 'الإيصال غير واضح'); if (why == null) return; x.status = 'rejected'; x.reason = why; x.rejectedBy = S.me ? S.me.name : ''; x.updatedAt = Date.now(); save('receipts', x); notifyReceipt(x); return receiptsInbox(box); }
     const nt = e.target.closest('[data-notify]'); if (nt) notifyReceipt(byId('receipts', nt.dataset.notify));
   };
