@@ -170,3 +170,32 @@ function errLine(e, withSub) {
   const p = errPlace(e).trim();
   return `${e.fixed ? '✅' : '❌'} ${withSub ? '<b>' + esc(errSubName(e.sub)) + ':</b> ' : ''}${p}${p && (e.type || e.note) ? ' — ' : ''}${esc(e.type || '')}${e.note ? ': ' + esc(e.note) : ''}${e.fixed ? ' <span class="muted">(صُوِّب)</span>' : ''}`;
 }
+
+/* ——— مناهج الفصل: كل معلم يختار ما يدرّسه في فصله فلا تظهر عنده مناهج أخرى ——— */
+/* مواد فصل أو مجموعة فصول (اتحاد) */
+function subjectsOf(cids) {
+  const cs = (cids && cids.length ? cids.map(id => byId('classes', id)) : (canAdmin() ? T('classes') : myClasses())).filter(Boolean);
+  if (!cs.length) return ['quran', 'noor', 'zad'].concat(curricula().map(c => c.id));
+  const set = new Set(); cs.forEach(c => classSubjects(c).forEach(x => set.add(x))); return [...set];
+}
+function canEditClassSubjects(c) { return c && (canAdmin() || (S.me && (c.teacherId === S.me.id || (c.teacherIds || []).includes(S.me.id)))); }
+function classSubjectsDialog(cid) {
+  const c = byId('classes', cid); if (!c) return toast('اختر فصلاً');
+  if (!canEditClassSubjects(c)) return toast('هذا الفصل ليس فصلك');
+  const f = features(); const cur = c.subjects || ['quran', 'noor', 'zad'];
+  const base = [['quran', '📖 القرآن الكريم (حفظ ومراجعة)'], ['noor', '🔤 القاعدة النورانية'], ['zad', '🌸 زاد الطفل المسلم']].filter(([k]) => f[k]);
+  const chip = (k, t, sub) => `<label class="list-item" style="cursor:pointer;gap:10px"><input type="checkbox" class="cs" value="${k}" ${cur.includes(k) ? 'checked' : ''} style="width:20px;height:20px"><div style="flex:1"><b>${t}</b>${sub ? `<div class="small muted">${sub}</div>` : ''}</div></label>`;
+  const m = modal({ title: '📚 مناهج ' + esc(c.name), body: `
+    <p class="small muted" style="margin-top:0">اختر ما تدرّسه في هذا الفصل فقط. تظهر المواد المختارة في المتابعة اليومية والتقارير والاختبارات وصفحة ولي الأمر، ولا تظهر غيرها. التسجيلات السابقة لا تُحذف.</p>
+    <div class="sec-h">المواد الأساسية</div>${base.map(([k, t]) => chip(k, t)).join('')}
+    <div class="sec-h" style="margin-top:10px">المناهج</div>${curricula().map(cu => chip(cu.id, cu.icon + ' ' + esc(cu.name), cu.lessons.length + ' درساً')).join('') || '<div class="small muted">لا توجد مناهج</div>'}`,
+    foot: '<button class="btn" data-ok>💾 حفظ مناهج الفصل</button>' });
+  $('[data-ok]', m.el).onclick = () => {
+    const sel = $$('.cs:checked', m.el).map(x => x.value);
+    if (!sel.length) return toast('اختر مادة واحدة على الأقل');
+    // يُحفظ ترتيب المواد كما في القائمة، مع إبقاء المواد غير الظاهرة (المعطّلة في الخصائص) كما كانت
+    const hidden = cur.filter(k => !isCur(k) && !f[k]);
+    c.subjects = hidden.concat(sel); c.subjSet = 1; c.updatedAt = Date.now(); save('classes', c);
+    m.close(); toast('✔️ حُفظت مناهج ' + c.name); render();
+  };
+}

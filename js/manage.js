@@ -19,7 +19,7 @@ function recParts(r) {
 /* أنواع الأجزاء للحذف الجماعي */
 function partKinds() {
   const K = [['hifz', '📖 الحفظ'], ['review', '🔁 المراجعة القريبة'], ['far', '🕰️ المراجعة البعيدة'], ['noor', '🔤 النورانية'], ['noorRev', '🔁 مراجعة النورانية']];
-  curricula().forEach(c => K.push(['cur:' + c.id, c.icon + ' ' + c.name], ['curRev:' + c.id, '🔁 مراجعة ' + c.name]));
+  curricula().filter(c => subjectsOf().includes(c.id)).forEach(c => K.push(['cur:' + c.id, c.icon + ' ' + c.name], ['curRev:' + c.id, '🔁 مراجعة ' + c.name]));
   K.push(['zad', '🌸 زاد الطفل'], ['zadRev', '🔁 مراجعة الزاد'], ['errors', '✏️ الأخطاء والتصويب'], ['note', '📝 ملاحظة المعلم'], ['behavior', '⭐ السلوك'], ['media', '🎙️ التسجيلات']);
   return K;
 }

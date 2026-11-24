@@ -64,11 +64,12 @@ function examBuilder(v, id) {
       <div class="field"><label>الدرجة الكلية وتوزيعها</label><div class="row"><input class="inp" type="number" id="xtot" value="${ex._target}" style="width:90px"><select class="inp" id="xdist" style="width:auto"><option value="q">بالتساوي على الأسئلة</option><option value="s">بالتساوي على المواد</option></select><button class="btn sm gold" id="xdo">⚖️ توزيع</button></div></div>
     </div></div>
     <div id="xsubs"></div>
-    <div class="card" style="text-align:center"><div class="row" style="justify-content:center"><select class="inp" id="xaddb" style="width:auto"><option value="">➕ إضافة مادة / كتاب…</option>${examBooks().map(b => `<option value="${b.id}">${b.icon} ${esc(b.name)}</option>`).join('')}</select></div></div>
+    <div class="card" style="text-align:center"><div class="row" style="justify-content:center"><select class="inp" id="xaddb" style="width:auto"><option value="">➕ إضافة مادة / كتاب…</option>${examBooks(ex.classIds).map(b => `<option value="${b.id}">${b.icon} ${esc(b.name)}</option>`).join('')}</select></div></div>
     <div class="card xbar"><div class="row"><b>مجموع درجات الأسئلة: <span id="xsum" style="color:var(--teal);font-size:20.5px">${toAr(ex.total)}</span></b><span class="muted small" id="xsumnote"></span><span style="flex:1"></span>
       <button class="btn light" id="xp">📄 نموذج الاختبار</button><button class="btn light" id="xa">✅ نموذج الإجابة</button><button class="btn" id="xs">💾 حفظ الاختبار</button></div></div>`;
   const cg = [{ name: '', items: T('classes').filter(c => canAdmin() || myClasses().some(m => m.id === c.id)).map(c => ({ key: c.id, t: c.name })) }];
-  $('#xcls').appendChild(multiDrop(cg, ex.classIds, 'الفصول', k => ex.classIds = k));
+  const fillBooks = () => { const sel = $('#xaddb'); if (sel) sel.innerHTML = '<option value="">➕ إضافة مادة / كتاب…</option>' + examBooks(ex.classIds).map(b => `<option value="${b.id}">${b.icon} ${esc(b.name)}</option>`).join(''); };
+  $('#xcls').appendChild(multiDrop(cg, ex.classIds, 'الفصول', k => { ex.classIds = k; fillBooks(); }));
   $('#xk').onchange = e => { const was = ex.title === autoTitle(); ex.kind = e.target.value; if (was || !ex.title) { ex.title = autoTitle(); $('#xt').value = ex.title; } };
   $('#xt').oninput = e => ex.title = e.target.value; $('#xn').oninput = e => ex.note = e.target.value;
   $('#xd').onchange = e => { ex.date = e.target.value; };

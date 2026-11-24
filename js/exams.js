@@ -15,8 +15,8 @@ const sample = (a, n) => shuffle(a).slice(0, n);
 const r05 = x => Math.round(x * 2) / 2;
 
 /* ——— الكتب المتاحة للاختبار ——— */
-function examBooks() {
-  const f = features(); const B = [];
+function examBooks(cids) {
+  const f = features(); const B = []; const allow = cids === undefined ? null : new Set(subjectsOf(cids));
   if (f.quran) B.push({ id: 'quran', name: 'القرآن الكريم', icon: '📖', kind: 'quran', groups: JUZ_LIST.map(j => ({ name: j.name, lessons: j.surahs.map(n => ({ key: 's' + n, t: 'سورة ' + Q.names[n - 1], s: n })) })) });
   if (f.noor) B.push({ id: 'noor', name: 'القاعدة النورانية', icon: '🔤', kind: 'noor', groups: [{ name: '', lessons: NOORANIA.map((l, i) => ({ key: 'n' + (i + 1), t: l.title, items: l.items })) }] });
   if (f.zad) B.push({ id: 'zad', name: 'زاد الطفل المسلم', icon: '🌸', kind: 'zad', groups: zadCurriculum().map(c => ({ name: c.icon + ' ' + c.name, lessons: c.items.map((it, i) => ({ key: c.id + '_' + i, t: it, cat: c.id })) })) });
@@ -24,7 +24,7 @@ function examBooks() {
     const kind = c.lessons.some(l => /^حرف\s/.test(l.t)) ? 'letters' : c.lessons.some(l => /^الرقم\s/.test(l.t)) ? 'numbers' : 'custom';
     B.push({ id: c.id, name: c.name, icon: c.icon, kind, groups: [{ name: '', lessons: c.lessons.map((l, i) => ({ key: 'l' + (i + 1), t: l.t, items: l.items, p: l.p })) }] });
   });
-  return B;
+  return allow ? B.filter(b => allow.has(b.id)) : B;
 }
 const bookById = id => examBooks().find(b => b.id === id);
 const bookLessons = b => b.groups.flatMap(g => g.lessons);

@@ -61,8 +61,10 @@ function viewDaily(v, sub) {
       <select class="inp" id="dcls" style="width:auto;font-weight:700">${classes.map(x => `<option value="${x.id}" ${x.id === DAY.cls ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
       <button class="btn sm light" id="dprev">▶</button><input type="date" class="inp" id="ddate" value="${DAY.date}" style="width:auto"><button class="btn sm light" id="dnext">◀</button>
       <span class="small muted">${dayName(DAY.date)} · ${hijri(DAY.date)}</span>${DAY.date !== todayISO() ? '<button class="btn sm ghost" id="dtoday">اليوم</button>' : ''}
+      ${canEditClassSubjects(c) ? `<button class="btn sm light" id="dsubj" title="اختر المناهج التي تدرّسها في هذا الفصل">📚 مناهج فصلي <span class="chip" style="padding:0 7px">${subj.length}</span></button>` : ''}
       <span style="flex:1"></span><span class="chip green">حاضر ${pres}</span><span class="chip red">غائب ${abs}</span><span class="chip">${num(pages, 1)} وجه</span>
     </div>
+    ${c && !c.subjSet && canEditClassSubjects(c) && S.me && S.me.role === 'teacher' ? `<div class="card" style="background:#eef8f5;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="font-size:26px">📚</span><div style="flex:1;min-width:200px"><b>اختر مناهج فصلك</b><div class="small muted">حدد المواد والمناهج التي تدرّسها في «${esc(c.name)}» لتظهر وحدها في المتابعة والتقارير والاختبارات وصفحة ولي الأمر.</div></div><button class="btn" id="dsubjhint">📚 اختيار المناهج</button></div>` : ''}
     ${!isWork ? '<div class="card small" style="background:#fff8e1">ℹ️ هذا اليوم ليس من أيام الدراسة المحددة في الإعدادات — يمكنك التسجيل مع ذلك.</div>' : ''}
     <div class="row" style="margin-bottom:10px"><button class="btn sm" id="allp">✅ الكل حاضر</button><button class="btn sm light" id="absWa">💬 إشعار الغائبين</button><button class="btn sm light" id="dailyWa">📤 إرسال تقارير اليوم</button><a class="btn sm light" href="#/reports/week/${DAY.cls}">🗓️ جدول الأسبوع</a></div>
     <div id="dlist">${list.map((s, i) => { const r = recs[i]; return `<div class="stu-card ${r && r.att === 'a' ? 'absent' : ''}" data-id="${s.id}">
@@ -70,6 +72,8 @@ function viewDaily(v, sub) {
       <div class="att">${Object.entries(ATT).map(([k, [t, cl]]) => `<button class="${cl} ${r && r.att === k ? 'on' : ''}" data-att="${k}">${t}</button>`).join('')}</div></div>
       <div class="sum" data-open>${recSummary(r, subj)} <button class="btn sm light" style="margin-inline-start:auto">✏️ تسجيل</button></div></div>`; }).join('') || '<div class="card empty"><span class="e">👦</span>لا يوجد طلاب في هذا الفصل<br><br>' + (canAdmin() ? '<a class="btn" href="#/classes">إضافة طلاب للفصل</a>' : '') + '</div>'}</div>`;
   $('#dcls').onchange = e => { DAY.cls = e.target.value; render(); };
+  const dsb = $('#dsubj'); if (dsb) dsb.onclick = () => classSubjectsDialog(DAY.cls);
+  const dsh = $('#dsubjhint'); if (dsh) dsh.onclick = () => classSubjectsDialog(DAY.cls);
   $('#ddate').onchange = e => { DAY.date = e.target.value || todayISO(); render(); };
   const step = d => { let x = DAY.date; for (let k = 0; k < 7; k++) { x = addDays(x, d); if ((S.settings.workDays || []).includes(parseISO(x).getDay())) break; } DAY.date = x; render(); };
   $('#dprev').onclick = () => step(-1); $('#dnext').onclick = () => step(1);

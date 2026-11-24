@@ -269,8 +269,19 @@ function route_(r) {
 
   if (a === 'save') {
     if (!TABLES[r.table]) return { ok: false, error: 'جدول غير معروف' };
-    if (me.role === 'teacher' && ['records', 'students', 'results', 'exams', 'outbox'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
+    if (me.role === 'teacher' && ['records', 'students', 'results', 'exams', 'outbox', 'classes'].indexOf(r.table) < 0) return { ok: false, error: 'لا تملك الصلاحية' };
     var rows = r.rows || [];
+    if (r.table === 'classes' && me.role === 'teacher') { // المعلم يغيّر مناهج فصله فقط، ولا يمس باقي بيانات الفصل
+      var curCls = readAll_('classes');
+      rows = rows.map(function (x) {
+        var o = curCls.filter(function (c) { return c.id === x.id; })[0];
+        if (!o || !(o.teacherId === me.id || (o.teacherIds || []).indexOf(me.id) >= 0)) return null;
+        o.subjects = (x.subjects || []).filter(function (k) { return typeof k === 'string' && k.length < 40; }).slice(0, 40); o.subjSet = 1; o.updatedAt = x.updatedAt || Date.now();
+        return o;
+      }).filter(Boolean);
+      if (!rows.length) return { ok: true, saved: 0 };
+      r.rows = rows;
+    }
     if (r.table === 'outbox' && me.role === 'teacher') rows.forEach(function (x) { x.by = me.id; x.byName = me.name; });
     if (r.table === 'users') {
       if (me.role !== 'admin') return { ok: false, error: 'للمدير فقط' };
