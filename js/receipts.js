@@ -13,12 +13,14 @@ function bankBoxHTML() {
 
 /* ——— ولي الأمر: رفع إيصال السداد بخطوة واحدة (تصوير فقط، والباقي تلقائي) ——— */
 async function parentReceiptDialog(s) {
+  const admin = !URLQ.get('p'); // رفع من الإدارة نيابة عن ولي الأمر
+  if (admin && !s.parentToken) { s.parentToken = token20(); save('students', s); try { await flush(); } catch (e) {} }
   const tok = URLQ.get('p') || s.parentToken;
   const cur = S.settings.currency;
   const m = modal({ title: '📤 إيصال سداد — ' + esc(s.name), body: `
     <div id="rcp-box" style="text-align:center">
-      <p style="margin-top:0">صوّر إيصال التحويل أو اختر صورته، وسيُسجَّل باسم <b>${esc(s.name)}</b> تلقائياً.</p>
-      <label class="btn block" style="padding:18px;font-size:19px"><input type="file" id="rcp-file" accept="image/*,.pdf" hidden>📷 تصوير الإيصال</label>
+      <p style="margin-top:0">${admin ? 'ارفع صورة الإيصال التي أرسلها ولي الأمر (من الواتساب مثلاً)، فتُقرأ وتدخل الإيصالات الواردة باسم' : 'صوّر إيصال التحويل أو اختر صورته، وسيُسجَّل باسم'} <b>${esc(s.name)}</b> تلقائياً.</p>
+      <label class="btn block" style="padding:18px;font-size:19px"><input type="file" id="rcp-file" accept="image/*,.pdf" hidden>${admin ? '🖼️ اختيار صورة الإيصال' : '📷 تصوير الإيصال'}</label>
       <div id="rcp-st" style="margin-top:10px"></div>
     </div>`, foot: false });
   $('#rcp-file', m.el).onchange = async e => {
@@ -31,10 +33,11 @@ async function parentReceiptDialog(s) {
       const fl = r.fields || {};
       const r2 = await api('parentReceiptSubmit', { t: tok, fileId: r.fileId, hash: r.hash, ai: r.ai, fields: { amount: fl.amount, date: fl.date, payer: fl.payer, fromBank: fl.fromBank, ref: fl.ref, toAccount: fl.toAccount, note: fl.note } });
       if (!r2.ok) throw new Error(r2.error);
-      $('#rcp-box', m.el).innerHTML = `<div style="font-size:54px">${r2.status === 'approved' ? '✅' : '📨'}</div><h3 style="margin:6px 0">وصل الإيصال، جزاكم الله خيراً</h3>
+      $('#rcp-box', m.el).innerHTML = `<div style="font-size:54px">${r2.status === 'approved' ? '✅' : '📨'}</div><h3 style="margin:6px 0">${admin ? 'تم رفع الإيصال' : 'وصل الإيصال، جزاكم الله خيراً'}</h3>
         ${+fl.amount ? `<div style="font-size:20px">المبلغ: <b>${num(fl.amount)}</b> ${cur}</div>` : ''}
-        <div class="small muted" style="margin-top:6px">${r2.status === 'approved' ? 'تم اعتماده وتسجيله في الرسوم.' : 'سيظهر في الرسوم بعد مراجعة الإدارة.'}</div>
-        <button class="btn block" style="margin-top:14px" onclick="location.reload()">تم</button>`;
+        <div class="small muted" style="margin-top:6px">${r2.status === 'approved' ? 'تم اعتماده وتسجيله في الرسوم.' : admin ? 'دخل «الإيصالات الواردة» كأن ولي الأمر رفعه، ويظهر له «قيد المراجعة».' : 'سيظهر في الرسوم بعد مراجعة الإدارة.'}</div>
+        ${admin ? `<button class="btn block" style="margin-top:14px" id="rcp-go">${r2.status === 'approved' ? '💰 فتح الرسوم' : '📥 مراجعته واعتماده الآن'}</button>` : '<button class="btn block" style="margin-top:14px" onclick="location.reload()">تم</button>'}`;
+      const go = $('#rcp-go', m.el); if (go) go.onclick = async () => { go.disabled = true; go.textContent = '⏳'; try { await pull(true); } catch (e) {} m.close(); location.hash = r2.status === 'approved' ? '#/fees' : '#/fees/receipts'; render(); };
     } catch (er) { lbl.style.display = ''; stl.innerHTML = '<span style="color:var(--red)">⚠️ ' + esc((er && er.message) || 'تعذر الإرسال') + ' — حاول مرة أخرى</span>'; }
     e.target.value = '';
   };
@@ -52,6 +55,7 @@ function receiptsInbox(box) {
   const cur = S.settings.currency;
   box.innerHTML = `<div class="tabs p-tabs">${[['pending', '⏳ بانتظار المراجعة'], ['approved', '✅ المعتمدة'], ['rejected', '❌ المرفوضة']].map(([k, t]) => `<button data-rt="${k}" class="${tab === k ? 'on' : ''}">${t} (${all.filter(x => x.status === k).length})</button>`).join('')}</div>
     <div class="row small" style="margin-bottom:8px;gap:10px;flex-wrap:wrap"><label class="row"><input type="checkbox" id="rc-on" ${S.settings.receiptOn !== false ? 'checked' : ''}> زر «رفع إيصال سداد» في صفحة ولي الأمر</label><label class="row"><input type="checkbox" id="rc-auto" ${S.settings.receiptAuto ? 'checked' : ''}> اعتماد تلقائي للإيصال إذا اجتاز كل الفحوص</label><button class="btn sm light" id="rc-bank">🏦 بيانات الحساب</button></div>
+    <button class="btn block" id="rc-up" style="margin-bottom:10px">📤 رفع إيصال نيابة عن ولي أمر</button>
     ${list.length ? list.map(x => `<div class="card" style="padding:10px 12px"><div class="row" style="gap:10px;align-items:flex-start;flex-wrap:wrap">
       <button class="btn light" data-img="${x.id}" style="width:86px;height:86px;padding:0;font-size:30px" title="عرض الإيصال">🧾</button>
       <div style="flex:1;min-width:220px"><div><b style="font-size:19px">${+x.amount ? num(x.amount) + '</b> ' + cur : '؟</b> <span class="small" style="color:var(--red)">المبلغ لم يُقرأ</span>'} ${rcpStatus(x.status)} <span class="small muted">${x.date ? fmtDate(x.date, false) : ''} · رُفع ${new Date(x.createdAt || 0).toLocaleString('ar-SA-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' })}</span></div>
@@ -63,6 +67,7 @@ function receiptsInbox(box) {
   box.onclick = async e => {
     const t = e.target.closest('[data-rt]'); if (t) { sessionStorage.setItem('rcpt', t.dataset.rt); return receiptsInbox(box); }
     if (e.target.id === 'rc-bank') return bankSettingsDialog();
+    if (e.target.id === 'rc-up') return pickStudentFor(st => parentReceiptDialog(st));
     const im = e.target.closest('[data-img]'); if (im) return showReceiptImage(byId('receipts', im.dataset.img));
     const ok = e.target.closest('[data-ok]'); if (ok) { const x = byId('receipts', ok.dataset.ok);
       const am = await promptBox('المبلغ المعتمد (' + S.settings.currency + ') — صحّحه إن لزم بعد النظر في الإيصال:', String(x.amount || '')); if (am == null) return;
@@ -115,4 +120,16 @@ function promptBox(msg, def) {
     const go = () => { done = true; const v = $('#pb-v', m.el).value.trim(); m.close(); res(v); };
     $('[data-ok]', m.el).onclick = go; $('#pb-v', m.el).onkeydown = e => e.key === 'Enter' && go(); setTimeout(() => $('#pb-v', m.el).focus(), 50);
   });
+}
+
+/* اختيار طالب بالبحث */
+function pickStudentFor(cb) {
+  if (isLocal()) return toast('رفع الإيصالات يحتاج الربط بالخادم');
+  const list = T('students').filter(x => x.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  const m = modal({ title: '👦 لأي طالب هذا الإيصال؟', body: `<input class="inp" id="ps-q" placeholder="🔍 اكتب اسم الطالب أو جوال ولي الأمر" style="margin-bottom:8px"><div id="ps-l" style="max-height:55vh;overflow:auto"></div>`, foot: false });
+  const draw = () => { const q = Q.norm($('#ps-q', m.el).value), d = toLatin($('#ps-q', m.el).value).replace(/\D/g, '');
+    const r = list.filter(x => !q || Q.norm(x.name).includes(q) || (d.length >= 4 && String(x.guardianPhone || '').includes(d))).slice(0, 60);
+    $('#ps-l', m.el).innerHTML = r.map(x => `<button class="list-item" data-s="${x.id}" style="width:100%;text-align:right;border:0;background:none;cursor:pointer"><div style="flex:1"><b>${esc(x.name)}</b><div class="small muted">${esc((classOf(x) || {}).name || '')} · ${esc(x.guardianName || '')}</div></div><span class="small muted">المتبقي ${num(Math.max(0, feeOf(x) - paidOf(x)))}</span></button>`).join('') || '<div class="empty">لا نتائج</div>'; };
+  $('#ps-q', m.el).oninput = draw; draw(); setTimeout(() => $('#ps-q', m.el).focus(), 50);
+  $('#ps-l', m.el).onclick = e => { const b = e.target.closest('[data-s]'); if (b) { m.close(); cb(byId('students', b.dataset.s)); } };
 }
